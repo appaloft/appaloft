@@ -85,6 +85,37 @@ describe("Dashboard scoped extensions", () => {
     ).toBe(false);
   });
 
+  test("[DASH-EXT-003] resolves active organization context without a Cloud-owned route schema", () => {
+    const route = parseDashboardRoute("/settings");
+    const settingsExtension: SystemPluginWebExtension = {
+      ...extensions[0]!,
+      key: "cloud-billing",
+      path: "/organization/billing",
+      metadata: {
+        renderer: "console-page",
+        pageEndpoint:
+          "/cloud/billing/console-page?organizationId={organizationId}&organizationRole={organizationRole}",
+        scopedNavigation: {
+          scope: "workspace",
+          destination: "settings",
+          presentation: "section",
+          key: "cloud-billing",
+          labelKey: "extensions.billing",
+          iconKey: "wallet",
+          order: 100,
+          routeTemplate: "/settings",
+        },
+      },
+    };
+
+    expect(
+      activeScopedExtensions([settingsExtension], route, {
+        organizationId: "org_demo",
+        organizationRole: "owner",
+      })[0]?.pageEndpoint,
+    ).toBe("/cloud/billing/console-page?organizationId=org_demo&organizationRole=owner");
+  });
+
   test("[DASH-EXT-002][DASH-EXT-004] selects only the active owner destination", () => {
     const active = activeScopedExtensions(
       extensions,

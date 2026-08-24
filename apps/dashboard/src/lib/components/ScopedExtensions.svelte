@@ -8,6 +8,7 @@
     isConsoleExtensionPageDocumentV1,
     type ConsoleExtensionPageDocumentV1,
   } from "$lib/extensions";
+  import { dashboardClient } from "$lib/data-client";
   import type { DashboardRoute } from "$lib/navigation";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
@@ -27,6 +28,23 @@
 
   let extensionsPromise: Promise<SystemPluginWebExtension[]> | undefined;
   const visibilityCache = new Map<string, Promise<boolean>>();
+  let organizationContextPromise:
+    | Promise<{ organizationId: string; organizationRole: string } | null>
+    | undefined;
+
+  function loadOrganizationContext(): Promise<{
+    organizationId: string;
+    organizationRole: string;
+  } | null> {
+    organizationContextPromise ??= dashboardClient.organizations
+      .currentContext({})
+      .then((context) => ({
+        organizationId: context.currentOrganization.organizationId,
+        organizationRole: context.currentOrganization.role,
+      }))
+      .catch(() => null);
+    return organizationContextPromise;
+  }
 
   function loadExtensions(): Promise<SystemPluginWebExtension[]> {
     extensionsPromise ??= fetch("/api/system-plugins/web-extensions", {
@@ -63,7 +81,17 @@
     loading = true;
     failed = false;
     try {
-      const contributions = activeScopedExtensions(await loadExtensions(), route);
+      const extensions = await loadExtensions();
+      let contributions = activeScopedExtensions(extensions, route);
+      const requiresOrganizationContext = contributions.some((contribution) =>
+        JSON.stringify(contribution).includes("{organization"),
+      );
+      if (requiresOrganizationContext) {
+        const organizationContext = await loadOrganizationContext();
+        if (organizationContext) {
+          contributions = activeScopedExtensions(extensions, route, organizationContext);
+        }
+      }
       const visible = (
         await Promise.all(
           contributions.map(async (contribution) => ({

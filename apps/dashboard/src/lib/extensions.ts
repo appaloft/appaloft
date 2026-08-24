@@ -22,6 +22,12 @@ export interface ActiveScopedExtension {
   readonly route: string;
 }
 
+export interface DashboardExtensionTemplateContext {
+  readonly organizationId?: string;
+  readonly organizationRole?: string;
+  readonly organizationSlug?: string;
+}
+
 function routeScope(route: DashboardRoute): {
   scope: SystemPluginWebExtensionScopedNavigation["scope"];
   destination: string;
@@ -77,7 +83,11 @@ function endpointMetadata(extension: SystemPluginWebExtension): {
   };
 }
 
-export function resolveDashboardExtensionTemplate(template: string, route: DashboardRoute): string {
+export function resolveDashboardExtensionTemplate(
+  template: string,
+  route: DashboardRoute,
+  context: DashboardExtensionTemplateContext = {},
+): string {
   const replacements: Record<string, string> = {
     pathname: typeof location === "undefined" ? "" : `${location.pathname}${location.search}`,
     query: typeof location === "undefined" ? "" : location.search.slice(1),
@@ -89,6 +99,10 @@ export function resolveDashboardExtensionTemplate(template: string, route: Dashb
       route.kind === "workspace" || route.kind === "project" || route.kind === "resource"
         ? route.destination
         : "",
+    organizationId: context.organizationId ?? "",
+    organizationRole: context.organizationRole ?? "",
+    organizationSlug: context.organizationSlug ?? "",
+    tenantId: context.organizationId ?? "",
   };
 
   return Object.entries(replacements).reduce(
@@ -100,6 +114,7 @@ export function resolveDashboardExtensionTemplate(template: string, route: Dashb
 export function activeScopedExtensions(
   extensions: readonly SystemPluginWebExtension[],
   route: DashboardRoute,
+  context: DashboardExtensionTemplateContext = {},
 ): ActiveScopedExtension[] {
   const active = routeScope(route);
   if (!active) return [];
@@ -121,10 +136,14 @@ export function activeScopedExtensions(
         {
           extension,
           navigation,
-          route: resolveDashboardExtensionTemplate(navigation.routeTemplate, route),
+          route: resolveDashboardExtensionTemplate(navigation.routeTemplate, route, context),
           ...(endpoints.pageEndpoint
             ? {
-                pageEndpoint: resolveDashboardExtensionTemplate(endpoints.pageEndpoint, route),
+                pageEndpoint: resolveDashboardExtensionTemplate(
+                  endpoints.pageEndpoint,
+                  route,
+                  context,
+                ),
               }
             : {}),
           ...(endpoints.visibilityEndpoint
@@ -132,6 +151,7 @@ export function activeScopedExtensions(
                 visibilityEndpoint: resolveDashboardExtensionTemplate(
                   endpoints.visibilityEndpoint,
                   route,
+                  context,
                 ),
               }
             : {}),
