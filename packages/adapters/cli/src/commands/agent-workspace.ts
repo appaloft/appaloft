@@ -943,15 +943,18 @@ export const workspaceCodeCommand = EffectCommand.make(
         onProgress(occupancyOpeningProgress(door.serverName));
         // folder.local occupy executes OpenAgentWorkspaceCommand through
         // executeFolderLocalWorkspaceOpen → createRemoteSandbox (sandboxes.create).
+        const occupyAttemptTimeoutMs = occupyDiskGatewayAttemptTimeoutMs(
+          cli.environment ?? process.env,
+        );
         const openDisk = (workspaceCommand: OpenAgentWorkspaceCommand) =>
           openWorkspaceWithOccupyDiskGatewayRetry(() => cli.executeCommand(workspaceCommand), {
             ...(options?.keepRetryingTransientDisk
               ? {
                   attempts: OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS,
                   deadlineMs: occupyDiskGatewayDeadlineMs(cli.environment ?? process.env),
-                  attemptTimeoutMs: occupyDiskGatewayAttemptTimeoutMs(
-                    cli.environment ?? process.env,
-                  ),
+                  ...(occupyAttemptTimeoutMs === undefined
+                    ? {}
+                    : { attemptTimeoutMs: occupyAttemptTimeoutMs }),
                 }
               : {}),
             ...(options?.signal ? { signal: options.signal } : {}),
