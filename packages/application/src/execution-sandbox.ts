@@ -1264,10 +1264,28 @@ export class ExecutionSandboxService {
     if (limits.isErr()) return err(limits.error);
     const networkPolicy = SandboxNetworkPolicy.create(input.networkPolicy);
     if (networkPolicy.isErr()) return err(networkPolicy.error);
+    let createIsolation = isolation.value;
+    let createLimits = limits.value;
+    let createNetworkPolicy = networkPolicy.value;
+    if (input.source.kind === "template") {
+      const template = await this.repository.findTemplate(
+        repositoryContext,
+        input.source.templateId,
+      );
+      if (!template) return err(domainError.notFound("SandboxTemplate", input.source.templateId));
+      const resolved = template.template.resolveCreatePolicy({
+        requestedIsolation: isolation.value,
+        limits: limits.value,
+      });
+      if (resolved.isErr()) return err(resolved.error);
+      createIsolation = resolved.value.requestedIsolation;
+      createLimits = resolved.value.limits;
+      createNetworkPolicy = resolved.value.networkPolicy;
+    }
     const candidates = this.providerRegistry.listCompatible({
-      isolation: isolation.value,
+      isolation: createIsolation,
       ...(chosenProviderKey ? { providerKey: chosenProviderKey } : {}),
-      networkMode: networkPolicy.value.toState().mode,
+      networkMode: createNetworkPolicy.toState().mode,
     });
     let provider: SandboxProvider | undefined;
     if (this.placementPolicy && !chosenProviderKey) {
@@ -1312,22 +1330,9 @@ export class ExecutionSandboxService {
     if (this.quotaPolicy) {
       const admitted = await this.quotaPolicy.admit(context, {
         usage: await this.repository.summarizeActiveUsage(repositoryContext),
-        requested: limits.value.toState(),
+        requested: createLimits.toState(),
       });
       if (admitted.isErr()) return err(admitted.error);
-    }
-    if (input.source.kind === "template") {
-      const template = await this.repository.findTemplate(
-        repositoryContext,
-        input.source.templateId,
-      );
-      if (!template) return err(domainError.notFound("SandboxTemplate", input.source.templateId));
-      const resolved = template.template.resolveCreatePolicy({
-        requestedIsolation: isolation.value,
-        limits: limits.value,
-        networkPolicy: networkPolicy.value,
-      });
-      if (resolved.isErr()) return err(resolved.error);
     }
     const createdAt = CreatedAt.create(this.clock.now());
     if (createdAt.isErr()) return err(createdAt.error);
@@ -1342,9 +1347,9 @@ export class ExecutionSandboxService {
         ...(input.commitSha ? { commitSha: input.commitSha } : {}),
       }),
       source,
-      requestedIsolation: isolation.value,
-      limits: limits.value,
-      networkPolicy: networkPolicy.value,
+      requestedIsolation: createIsolation,
+      limits: createLimits,
+      networkPolicy: createNetworkPolicy,
       createdAt: createdAt.value,
       ...(expiresAt?.isOk() ? { expiresAt: expiresAt.value } : {}),
       currentAttemptId: this.idGenerator.next("sat"),
@@ -1491,7 +1496,6 @@ export class ExecutionSandboxService {
       const resolved = template.template.resolveCreatePolicy({
         requestedIsolation: state.requestedIsolation,
         limits: state.limits,
-        networkPolicy: state.networkPolicy,
       });
       if (resolved.isErr()) return err(resolved.error);
       providerSource = { kind: "image", image: resolved.value.image };
@@ -2961,6 +2965,8 @@ export class ExecutionSandboxService {
     context: ExecutionContext,
     templateId: string,
   ): Promise<Result<void>> {
+    const existing = await this.repository.findTemplate(toRepositoryContext(context), templateId);
+    if (existing) return ok(undefined);
     const reserved =
       templateId === COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID
         ? communityOccupancyOpenCodeTemplateSpec()

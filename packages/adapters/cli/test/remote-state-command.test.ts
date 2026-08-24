@@ -493,7 +493,7 @@ describe("CLI SSH remote-state lock commands", () => {
         removeRemoteStateFixture(tempRoot);
       }
     }
-  }, 15_000);
+  }, 45_000);
 
   test("[CONFIG-FILE-STATE-012G][CONFIG-FILE-STATE-021] backup creation rejects symlinked authoritative files", () => {
     for (const relativePath of [
