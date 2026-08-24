@@ -48,10 +48,11 @@
 - [x] Project Overview/List, Environment URL context, and Resource selection.
 - [x] Resource Overview/Deployments route-backed panel/full page.
 - [x] Resource Configuration, Logs & Metrics, Networking, and Settings.
-- [ ] Infrastructure and Activity.
-- [ ] Marketplace and Settings.
-- [ ] Project Deployments, Observability, and Settings.
-- [ ] Contextual Agent utility entry without a new lifecycle owner.
+- [x] Infrastructure and Activity.
+- [x] Marketplace and Settings.
+- [x] Project Deployments, Observability, and Settings.
+- [x] Contextual Agent utility entry without a new lifecycle owner.
+- [x] First-admin bootstrap and sign-in recovery routes, including safe same-origin return paths.
 - [ ] Benchmark-gated Topology view with List fallback.
 
 ## Rollout And Docs
@@ -59,8 +60,10 @@
 - [x] Record luminous-surface refinement PR #1431 and public `main` SHA
       `0dfe728286a5cedcf08c6d49d027f146f5574c9d` before the downstream hosted pin sync.
 - [x] Existing-anchor Docs Round: update both `reference/web-console` locales and docs registry.
-- [ ] Add breaking-route release note; do not add redirect promises.
-- [ ] Enable opt-in beta only after DASH-BETA rows pass.
+- [x] Add breaking-route release note; do not add redirect promises.
+- [x] Package both default and rollback binary bundles, then complete a real isolated-PGlite
+      first-admin -> sign-in -> Projects acceptance loop on the default bundle.
+- [x] Enable opt-in beta only after DASH-BETA rows pass.
 - [ ] Enable default only after all DASH-DEFAULT rows pass.
 - [ ] Run independent Public/Private Boundary Review after public implementation and merge.
 - [ ] Record public PR/final main SHA before any downstream hosted pin/cutover.

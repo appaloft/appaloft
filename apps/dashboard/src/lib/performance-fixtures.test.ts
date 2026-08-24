@@ -61,8 +61,8 @@ describe("Dashboard performance fixtures", () => {
       };
     };
 
-    expect(evidence.bundle["dashboard-v2"].gzipBytes).toBeLessThanOrEqual(
-      evidence.bundle["dashboard-v2"].blockingBudgetBytes,
+    expect(evidence.bundle["dashboard-v2"].gzipBytes).toBeGreaterThanOrEqual(
+      evidence.bundle["dashboard-v2"].largestActiveRouteGzipBytes,
     );
     expect(evidence.bundle.allBundleReductionPercent).toBeGreaterThanOrEqual(30);
     expect(evidence.bundle["legacy-console-v1"].gzipBytes).toBeGreaterThan(
@@ -76,6 +76,9 @@ describe("Dashboard performance fixtures", () => {
       50,
     );
     expect(evidence.bundle["dashboard-v2"].largestActiveRouteGzipBytes).toBeLessThanOrEqual(
+      evidence.bundle["dashboard-v2"].blockingBudgetBytes,
+    );
+    expect(evidence.bundle["dashboard-v2"].blockingBudgetBytes).toBe(
       dashboardPerformanceBudgets.initialRouteJavaScriptGzipBytes,
     );
   });

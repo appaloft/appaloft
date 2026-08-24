@@ -11,7 +11,7 @@ export interface ConsoleSurface {
 }
 
 export function resolveConsoleSurface(input: { root: string; preset?: string }): ConsoleSurface {
-  const preset = input.preset?.trim() || "legacy-console-v1";
+  const preset = input.preset?.trim() || "dashboard-v2";
 
   if (!consoleSurfacePresets.includes(preset as ConsoleSurfacePreset)) {
     throw new Error(

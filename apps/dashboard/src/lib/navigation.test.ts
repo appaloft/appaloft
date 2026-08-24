@@ -91,4 +91,26 @@ describe("Dashboard navigation", () => {
     });
     expect(workspaceNavigation.some(({ id }) => id === ("patterns" as never))).toBe(false);
   });
+
+  test("[DASH-AUTH-001] recognizes only the required public authentication recovery routes", () => {
+    expect(parseDashboardRoute("/login?next=%2Fprojects%2Fatlas%2Foverview")).toEqual({
+      kind: "auth",
+      destination: "login",
+      next: "/projects/atlas/overview",
+      filters: [],
+    });
+    expect(parseDashboardRoute("/bootstrap/auth/first-admin")).toEqual({
+      kind: "auth",
+      destination: "first-admin",
+      filters: [],
+    });
+  });
+
+  test("[DASH-NAV-005] makes the console root a useful project landing page", () => {
+    expect(parseDashboardRoute("/")).toEqual({
+      kind: "workspace",
+      destination: "projects",
+      filters: [],
+    });
+  });
 });

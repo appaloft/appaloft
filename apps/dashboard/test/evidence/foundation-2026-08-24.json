@@ -1,6 +1,6 @@
 {
   "schemaVersion": "appaloft.dashboard-foundation-evidence/v1",
-  "capturedAt": "2026-08-24T16:49:45Z",
+  "capturedAt": "2026-08-24T18:23:08Z",
   "machine": {
     "platform": "darwin-arm64",
     "bun": "1.4.0",
@@ -15,13 +15,13 @@
     },
     "dashboard-v2": {
       "buildDirectory": "apps/dashboard/build/_app/immutable",
-      "javascriptFiles": 30,
-      "gzipBytes": 295305,
-      "largestActiveRouteJavascriptFiles": 22,
-      "largestActiveRouteGzipBytes": 278459,
+      "javascriptFiles": 49,
+      "gzipBytes": 327417,
+      "largestActiveRouteJavascriptFiles": 30,
+      "largestActiveRouteGzipBytes": 287040,
       "blockingBudgetBytes": 307200
     },
-    "allBundleReductionPercent": 67.5
+    "allBundleReductionPercent": 64.4
   },
   "fixtures": {
     "resourceCounts": [1, 10, 50, 100],
@@ -36,7 +36,16 @@
     "routes": [
       "/projects",
       "/projects/atlas-api/overview?environment=production",
+      "/infrastructure",
+      "/activity",
+      "/marketplace",
+      "/settings",
+      "/projects/atlas-api/deployments?environment=production",
+      "/projects/atlas-api/observability?environment=production",
+      "/projects/atlas-api/settings?environment=production",
       "/projects/atlas-api/resources/api-gateway/overview?environment=production&view=list",
+      "/login",
+      "/bootstrap/auth/first-admin",
       "/patterns"
     ],
     "outcome": "pass"
@@ -47,6 +56,17 @@
     "fixtures": [
       "projects-desktop-light.png",
       "project-desktop-light.png",
+      "workspace-infrastructure-desktop-light.png",
+      "workspace-activity-desktop-light.png",
+      "workspace-marketplace-desktop-light.png",
+      "workspace-settings-desktop-light.png",
+      "project-deployments-desktop-light.png",
+      "project-observability-desktop-light.png",
+      "project-settings-desktop-light.png",
+      "project-agent-desktop-light.png",
+      "auth-login-desktop-light.png",
+      "auth-first-admin-desktop-light.png",
+      "auth-login-mobile-light.png",
       "resource-desktop-dark.png",
       "resource-configuration-desktop-light.png",
       "resource-observability-desktop-dark.png",
@@ -54,12 +74,29 @@
       "resource-settings-desktop-dark.png",
       "patterns-desktop-dark.png",
       "projects-mobile-dark.png",
+      "workspace-marketplace-mobile-dark.png",
+      "workspace-settings-mobile-dark.png",
+      "project-observability-mobile-dark.png",
+      "project-settings-mobile-dark.png",
       "resource-mobile-dark.png",
       "resource-settings-mobile-dark.png",
       "resource-tab-performance.json",
       "dashboard-route-performance.json",
       "legacy-route-performance.json"
     ]
+  },
+  "releaseAcceptance": {
+    "status": "pass",
+    "defaultPreset": "dashboard-v2",
+    "rollbackPreset": "legacy-console-v1",
+    "binaryVersion": "0.1.0",
+    "database": "isolated-pglite",
+    "healthStatus": 200,
+    "firstVisitPath": "/bootstrap/auth/first-admin",
+    "authenticatedLandingPath": "/projects",
+    "generatedPasswordRenderedOnce": true,
+    "horizontalOverflowPx": 0,
+    "unlabeledInteractiveControls": 0
   },
   "productDataRequestTiming": {
     "status": "pass",

@@ -26,11 +26,19 @@ sidebar:
 
 Web 控制台是 Appaloft 的图形化入口——它只负责收集输入、显示状态并调用和 CLI/API 完全相同的 HTTP/oRPC 契约,不会在 Web 层单独实现部署规则或生命周期解释。
 
-## Dashboard Beta 导航与数据边界
+## Dashboard 默认导航与数据边界
 
-新的 Dashboard 使用上下文导航减少常驻菜单：Workspace 只保留 **项目、基础设施、动态、市场、设置**；进入 Project 后切换为 **概览、部署、可观测性、设置**；进入 Resource 后，详情以桌面侧板或移动全页展示。`/` 进入 `/projects`，Dashboard 路由是新的 pre-1.0 契约，不保证旧 Web 深链继续可用。
+Dashboard 现在是发布包默认的图形界面，并使用上下文导航减少常驻菜单：Workspace 只保留 **项目、基础设施、动态、市场、设置**；进入 Project 后切换为 **概览、部署、可观测性、设置**；进入 Resource 后，详情以桌面侧板或移动全页展示。`/` 进入 `/projects`。这是一次有意的 pre-1.0 路由重构：旧 Web 深链可能直接返回 404，不提供重定向或功能对等保证。
 
-Projects → Project/Environment → Resource 的 Beta 闭环使用三个有界查询：
+五个 Workspace destination 和四个 Project destination 都读取真实的有界数据或显示明确的空/错误状态。Agent 位于右上角工具区，可将当前 Workspace 或 Project/Environment 上下文整理为任务简报；实际执行仍由既有 Agent Workspace 生命周期负责，不会成为第六个 Workspace 菜单。
+
+发布构建默认选择 `dashboard-v2`。稳定窗口内仍可通过 `--console-preset=legacy-console-v1`（或 `APPALOFT_CONSOLE_PRESET=legacy-console-v1`）显式构建旧界面用于回滚；旧源码没有在本次切换中删除。
+
+Dashboard 发布包包含完整的认证恢复入口：未初始化实例会把首次访问引导到
+`/bootstrap/auth/first-admin`，未登录用户使用 `/login`。本地密码和已配置的 OAuth provider
+都沿用服务端既有认证契约；登录返回地址只接受同源 Dashboard 路径。
+
+Projects → Project/Environment → Resource 闭环使用三个有界查询：
 
 - `projects.list-summaries`：返回一页 Project 摘要，不为每个 Project 再请求 Resource 或 Deployment；
 - `project-environments.overview`：一次返回 Environment 选择、Resource 健康/访问/最近部署摘要和 cursor；

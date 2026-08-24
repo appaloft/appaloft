@@ -6,7 +6,6 @@
     Boxes,
     CheckCircle2,
     ChevronDown,
-    GitBranch,
     LayoutGrid,
     List,
     LoaderCircle,
@@ -30,16 +29,44 @@
   import { dashboardProjectContext } from "$lib/project-context.svelte";
 
   import ScopedExtensions from "./ScopedExtensions.svelte";
+  import CreateResourceDialog from "./CreateResourceDialog.svelte";
 
   let { route }: { route: Extract<DashboardRoute, { kind: "project" | "resource" }> } = $props();
 
   let overview = $state<DashboardProjectEnvironmentOverview | undefined>();
   let loading = $state(true);
   let error = $state(false);
+  let createResourceOpen = $state(false);
   let latestRequest = 0;
 
   async function load(): Promise<void> {
     const request = ++latestRequest;
+    if (activeDestination !== "overview") {
+      overview = undefined;
+      loading = false;
+      error = false;
+      try {
+        const project = await dashboardClient.projects.show({ projectId: route.projectId });
+        if (request === latestRequest) {
+          dashboardProjectContext.set({
+            projectId: project.id,
+            projectName: project.name,
+            environmentId: route.environmentId || "production",
+            environmentName: route.environmentId || "production",
+          });
+        }
+      } catch {
+        if (request === latestRequest) {
+          dashboardProjectContext.set({
+            projectId: route.projectId,
+            projectName: route.projectId,
+            environmentId: route.environmentId || "production",
+            environmentName: route.environmentId || "production",
+          });
+        }
+      }
+      return;
+    }
     loading = true;
     error = false;
     try {
@@ -137,6 +164,7 @@
     route.search;
     route.sort;
     route.filters;
+    activeDestination;
     void load();
   });
 </script>
@@ -172,10 +200,7 @@
           <LayoutGrid class="size-4" />
         </button>
       </div>
-      <Button class="h-10 rounded-[10px] px-4 shadow-[var(--shadow-primary)] hover:shadow-[var(--shadow-primary-hover)]">
-        <Plus data-icon="inline-start" />
-        {i18n.t(copy.actions.addResource)}
-      </Button>
+      {#if activeDestination === "overview"}<Button data-add-resource class="h-10 rounded-[10px] px-4 shadow-[var(--shadow-primary)] hover:shadow-[var(--shadow-primary-hover)]" onclick={() => (createResourceOpen = true)}><Plus data-icon="inline-start" />{i18n.t(copy.actions.addResource)}</Button>{/if}
     </div>
   </div>
 
@@ -306,77 +331,15 @@
     </div>
     {/if}
   {:else if activeDestination === "deployments"}
-    {#if loading}
-      <div class="mt-8 grid min-h-72 place-items-center rounded-[16px] border border-divider bg-surface">
-        <LoaderCircle class="size-6 animate-spin text-primary" />
-      </div>
-    {:else if error || !overview}
-      <section class="mt-8 rounded-[16px] border border-destructive/25 bg-destructive/[0.04] p-8 text-center">
-        <TriangleAlert class="mx-auto size-6 text-destructive" />
-        <h2 class="mt-4 font-semibold">{i18n.t(copy.projects.loadError)}</h2>
-        <Button variant="outline" class="mt-5 h-10 rounded-[10px] shadow-none" onclick={() => void load()}>
-          <RefreshCw class="size-4" />
-          {i18n.t(copy.actions.retry)}
-        </Button>
-      </section>
-    {:else}
-      {@const deployedResources = overview.resources.filter((resource) => resource.latestDeployment)}
-      <section class="mt-8 overflow-hidden rounded-[16px] border border-divider bg-surface">
-        <div class="border-b border-divider p-5 sm:p-6">
-          <h2 class="font-semibold">{i18n.t(copy.project.recentDeployments)}</h2>
-          <p class="mt-1 text-sm text-muted-foreground">{content.description}</p>
-        </div>
-        {#if deployedResources.length === 0}
-          <p class="p-10 text-center text-sm text-muted-foreground">
-            {i18n.t(copy.resource.noDeployments)}
-          </p>
-        {:else}
-          <div class="divide-y divide-divider">
-            {#each deployedResources as resource}
-              <a
-                class="grid gap-3 p-5 transition-colors hover:bg-surface-subtle sm:grid-cols-[minmax(0,1fr)_160px_140px] sm:items-center"
-                href={resourceDestinationHref(route.projectId, resource.id, "deployments", overview.environment.id, {
-                  view: route.view,
-                  search: route.search,
-                  sort: route.sort,
-                  cursor: route.cursor,
-                  filters: route.filters,
-                })}
-              >
-                <div class="flex min-w-0 items-center gap-3">
-                  <span class="grid size-9 shrink-0 place-items-center rounded-[10px] bg-icon-cyan text-icon-cyan-foreground">
-                    <CheckCircle2 class="size-4" />
-                  </span>
-                  <div class="min-w-0">
-                    <p class="truncate text-sm font-medium">{resource.name}</p>
-                    <p class="mt-1 text-xs capitalize text-muted-foreground">{resource.kind.replaceAll("-", " ")}</p>
-                  </div>
-                </div>
-                <code class="truncate text-xs">{resource.latestDeployment?.id}</code>
-                <div class="flex items-center justify-between gap-2 sm:block sm:text-right">
-                  <p class="text-xs font-medium capitalize">{resource.latestDeployment?.status}</p>
-                  <p class="mt-1 text-xs text-muted-foreground">{activityLabel(resource.latestDeployment?.createdAt)}</p>
-                </div>
-              </a>
-            {/each}
-          </div>
-        {/if}
-      </section>
-    {/if}
+    {#await import("./ProjectDeployments.svelte")}<div class="mt-8 grid min-h-64 place-items-center rounded-[16px] border border-divider bg-surface"><LoaderCircle class="size-6 animate-spin text-primary" /></div>{:then module}<module.default projectId={route.projectId} environmentId={route.environmentId || "production"} />{:catch}<p class="mt-8 rounded-[16px] border border-destructive/25 p-8 text-center text-sm text-destructive">Deployment module failed to load.</p>{/await}
+  {:else if activeDestination === "observability"}
+    {#await import("./ProjectObservability.svelte")}<div class="mt-8 grid min-h-64 place-items-center rounded-[16px] border border-divider bg-surface"><LoaderCircle class="size-6 animate-spin text-primary" /></div>{:then module}<module.default projectId={route.projectId} />{:catch}<p class="mt-8 rounded-[16px] border border-destructive/25 p-8 text-center text-sm text-destructive">Observability module failed to load.</p>{/await}
   {:else}
-    <div class="mt-8 grid gap-4 md:grid-cols-3">
-      {#each ["Current scope", "Owner boundary", "Primary path"] as label, index}
-        <section class="min-h-48 rounded-[16px] border border-divider bg-surface p-5">
-          <div class="grid size-10 place-items-center rounded-[11px] bg-primary/10 text-primary">
-            {#if index === 0}<GitBranch class="size-[18px]" />{:else if index === 1}<Boxes class="size-[18px]" />{:else}<ArrowUpRight class="size-[18px]" />{/if}
-          </div>
-          <h2 class="mt-8 text-sm font-semibold">{label}</h2>
-          <p class="mt-2 text-sm text-muted-foreground">{content.description}</p>
-        </section>
-      {/each}
-    </div>
+    {#await import("./ProjectSettings.svelte")}<div class="mt-8 grid min-h-64 place-items-center rounded-[16px] border border-divider bg-surface"><LoaderCircle class="size-6 animate-spin text-primary" /></div>{:then module}<module.default projectId={route.projectId} />{:catch}<p class="mt-8 rounded-[16px] border border-destructive/25 p-8 text-center text-sm text-destructive">Settings module failed to load.</p>{/await}
   {/if}
   {#if route.kind === "project"}
     <ScopedExtensions {route} />
   {/if}
 </section>
+
+{#if createResourceOpen}<CreateResourceDialog projectId={route.projectId} environmentId={route.environmentId || overview?.environment.id || "production"} onclose={() => (createResourceOpen = false)} />{/if}

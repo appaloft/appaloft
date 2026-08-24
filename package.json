@@ -23,7 +23,8 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "bun --env-file=.env.develop --env-file=.env --env-file=.env.local --env-file=.env.develop.local turbo run dev --filter=@appaloft/web --filter=@appaloft/docs --filter=@appaloft/shell",
+    "dev": "bun --env-file=.env.develop --env-file=.env --env-file=.env.local --env-file=.env.develop.local turbo run dev --filter=@appaloft/dashboard --filter=@appaloft/docs --filter=@appaloft/shell",
+    "dev:legacy-web": "bun --env-file=.env.develop --env-file=.env --env-file=.env.local --env-file=.env.develop.local turbo run dev --filter=@appaloft/web --filter=@appaloft/docs --filter=@appaloft/shell",
     "dev:all": "turbo run dev --parallel",
     "dev:dashboard": "bun run --cwd apps/dashboard dev",
     "build:dashboard": "bun run --cwd apps/dashboard build",

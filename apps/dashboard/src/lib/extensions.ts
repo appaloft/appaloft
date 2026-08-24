@@ -80,6 +80,7 @@ function endpointMetadata(extension: SystemPluginWebExtension): {
 export function resolveDashboardExtensionTemplate(template: string, route: DashboardRoute): string {
   const replacements: Record<string, string> = {
     pathname: typeof location === "undefined" ? "" : `${location.pathname}${location.search}`,
+    query: typeof location === "undefined" ? "" : location.search.slice(1),
     projectId: route.kind === "project" || route.kind === "resource" ? route.projectId : "",
     environmentId:
       route.kind === "project" || route.kind === "resource" ? route.environmentId || "" : "",

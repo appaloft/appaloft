@@ -5,15 +5,26 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import {
   type AppLogger,
+  BootstrapFirstAdminCommand,
   CheckResourceDeleteSafetyQuery,
+  CheckProjectDeleteSafetyQuery,
   type Command,
   type CommandBus,
+  CreateResourceCommand,
   CreateProjectCommand,
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  GetCurrentOrganizationContextQuery,
+  GetAuthBootstrapStatusQuery,
+  ListBlueprintsQuery,
+  ListDependencyResourcesQuery,
   ListDeploymentsQuery,
+  ListEnvironmentsQuery,
+  ListOperatorWorkQuery,
   ListProjectSummariesQuery,
+  ListServersQuery,
+  ListOrganizationMembersQuery,
   type ProductSessionAuthorizationPort,
   ProjectEnvironmentOverviewQuery,
   type Query,
@@ -21,6 +32,8 @@ import {
   ResourceOverviewQuery,
   ResourceRuntimeLogsQuery,
   RuntimeMonitoringRollupQuery,
+  ShowOrganizationProfileQuery,
+  ShowProjectQuery,
   ShowResourceQuery,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
@@ -37,6 +50,7 @@ const apiFixtureRequests: string[] = [];
 const apiFixtureCommands: string[] = [];
 const apiFixtureQueries: string[] = [];
 let extensionFixtureEnabled = false;
+let bootstrapFixtureRequired = false;
 
 async function installDashboardApiFixtures(): Promise<void> {
   const buildRoot = new URL("../../build/", import.meta.url).pathname;
@@ -428,6 +442,167 @@ async function installDashboardApiFixtures(): Promise<void> {
         ],
       },
     ],
+    [
+      "fixtures/workspace-servers.json",
+      {
+        items: [
+          {
+            id: "server-production",
+            name: "Production edge",
+            host: "edge.example.test",
+            port: 22,
+            providerKey: "ssh",
+            targetKind: "single-server",
+            workloadRoles: ["deployment-runtime", "artifact-builder"],
+            lifecycleStatus: "active",
+            runtimeAvailability: { status: "available", reasonCodes: [] },
+            edgeProxy: { kind: "caddy", status: "ready" },
+            createdAt: "2026-08-20T08:00:00.000Z",
+          },
+        ],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      },
+    ],
+    [
+      "fixtures/workspace-activity.json",
+      {
+        schemaVersion: "operator-work.list/v1",
+        items: [
+          {
+            id: "work_deploy_atlas",
+            kind: "deployment",
+            status: "succeeded",
+            operationKey: "deployments.create",
+            projectId: "atlas-api",
+            resourceId: "api-gateway",
+            deploymentId: "dep_atlas",
+            updatedAt: "2026-08-24T08:01:00.000Z",
+            finishedAt: "2026-08-24T08:01:00.000Z",
+            nextActions: ["no-action"],
+          },
+        ],
+        generatedAt: "2026-08-24T08:01:00.000Z",
+      },
+    ],
+    [
+      "fixtures/workspace-dependencies.json",
+      {
+        schemaVersion: "dependency-resources.list/v1",
+        items: [],
+        generatedAt: "2026-08-24T08:01:00.000Z",
+      },
+    ],
+    [
+      "fixtures/workspace-blueprints.json",
+      {
+        items: [
+          {
+            id: "bun-web-service",
+            name: "Bun Web Service",
+            version: "1.0.0",
+            summary: "Production-ready Bun service",
+            tags: ["bun", "web"],
+            variants: [],
+            category: "Application",
+          },
+        ],
+      },
+    ],
+    [
+      "fixtures/workspace-context.json",
+      {
+        user: {
+          userId: "usr_dashboard",
+          email: "dashboard@example.test",
+          displayName: "Dashboard Operator",
+        },
+        currentOrganization: {
+          organizationId: "org_dashboard",
+          name: "Appaloft",
+          slug: "appaloft",
+          role: "owner",
+        },
+        organizations: [
+          { organizationId: "org_dashboard", name: "Appaloft", slug: "appaloft", role: "owner" },
+        ],
+        loginMethods: [{ key: "github", configured: true, enabled: true }],
+        permissions: {
+          canInviteMembers: true,
+          canListMembers: true,
+          canManageDeployTokens: true,
+          canRemoveMembers: true,
+          canTransferOwnership: true,
+          canUpdateMemberRoles: true,
+        },
+      },
+    ],
+    [
+      "fixtures/workspace-profile.json",
+      {
+        organizationId: "org_dashboard",
+        name: "Appaloft",
+        slug: "appaloft",
+        role: "owner",
+        createdAt: "2026-08-20T08:00:00.000Z",
+      },
+    ],
+    [
+      "fixtures/workspace-members.json",
+      {
+        items: [
+          {
+            memberId: "member_owner",
+            userId: "usr_dashboard",
+            role: "owner",
+            joinedAt: "2026-08-20T08:00:00.000Z",
+            displayName: "Dashboard Operator",
+            email: "dashboard@example.test",
+            status: "active",
+          },
+        ],
+      },
+    ],
+    [
+      "fixtures/project-detail.json",
+      {
+        id: "atlas-api",
+        organizationId: "org_dashboard",
+        name: "Atlas API",
+        slug: "atlas-api",
+        description: "Public API and background workers",
+        lifecycleStatus: "active",
+        createdAt: "2026-08-20T08:00:00.000Z",
+      },
+    ],
+    [
+      "fixtures/project-environments.json",
+      {
+        items: [
+          {
+            id: "production",
+            projectId: "atlas-api",
+            name: "Production",
+            kind: "production",
+            lifecycleStatus: "active",
+            createdAt: "2026-08-20T08:00:00.000Z",
+            maskedVariables: [],
+          },
+        ],
+      },
+    ],
+    [
+      "fixtures/project-delete-check.json",
+      {
+        schemaVersion: "projects.delete-check/v1",
+        projectId: "atlas-api",
+        lifecycleStatus: "active",
+        eligible: false,
+        blockers: [{ kind: "resource", count: 50 }],
+        checkedAt: "2026-08-24T08:00:00.000Z",
+      },
+    ],
   ]);
 
   for (const [path, payload] of fixtures) {
@@ -541,30 +716,74 @@ beforeAll(async () => {
       if (command instanceof CreateProjectCommand) {
         return ok({ id: "created-project" } as T);
       }
+      if (command instanceof CreateResourceCommand) {
+        return ok({ id: "created-resource" } as T);
+      }
+      if (command instanceof BootstrapFirstAdminCommand) {
+        return ok({
+          bootstrapRequired: false,
+          created: true,
+          email: command.email,
+          loginMethods: [{ key: "local-password", configured: true, enabled: true }],
+          organizationId: "org_dashboard",
+          organizationSlug: "appaloft",
+          userId: "usr_dashboard",
+          loginUrl: "/login",
+        } as T);
+      }
       return ok({ id: "api-gateway" } as T);
     },
   } as CommandBus;
   const queryBus = {
     execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
       apiFixtureQueries.push(query.constructor.name);
+      if (query instanceof GetAuthBootstrapStatusQuery) {
+        return ok({
+          bootstrapRequired: bootstrapFixtureRequired,
+          firstAdminConfigured: !bootstrapFixtureRequired,
+          organizationConfigured: !bootstrapFixtureRequired,
+          loginMethods: [{ key: "local-password", configured: true, enabled: true }],
+          loginUrl: "/login",
+        } as T);
+      }
       const fixturePath =
         query instanceof ListProjectSummariesQuery
           ? "api/projects/summaries"
           : query instanceof ProjectEnvironmentOverviewQuery
             ? "api/projects/atlas-api/environments/production/overview"
-            : query instanceof ResourceOverviewQuery
-              ? "api/projects/atlas-api/environments/production/resources/api-gateway/overview"
-              : query instanceof ShowResourceQuery
-                ? "fixtures/resource-detail.json"
-                : query instanceof ResourceRuntimeLogsQuery
-                  ? "fixtures/resource-logs.json"
-                  : query instanceof RuntimeMonitoringRollupQuery
-                    ? "fixtures/resource-rollup.json"
-                    : query instanceof CheckResourceDeleteSafetyQuery
-                      ? "fixtures/resource-delete-check.json"
-                      : query instanceof ListDeploymentsQuery
-                        ? "fixtures/resource-deployments.json"
-                        : undefined;
+            : query instanceof ListServersQuery
+              ? "fixtures/workspace-servers.json"
+              : query instanceof ListDependencyResourcesQuery
+                ? "fixtures/workspace-dependencies.json"
+                : query instanceof ListOperatorWorkQuery
+                  ? "fixtures/workspace-activity.json"
+                  : query instanceof ListBlueprintsQuery
+                    ? "fixtures/workspace-blueprints.json"
+                    : query instanceof ListEnvironmentsQuery
+                      ? "fixtures/project-environments.json"
+                      : query instanceof GetCurrentOrganizationContextQuery
+                        ? "fixtures/workspace-context.json"
+                        : query instanceof ShowOrganizationProfileQuery
+                          ? "fixtures/workspace-profile.json"
+                          : query instanceof ListOrganizationMembersQuery
+                            ? "fixtures/workspace-members.json"
+                            : query instanceof ShowProjectQuery
+                              ? "fixtures/project-detail.json"
+                              : query instanceof CheckProjectDeleteSafetyQuery
+                                ? "fixtures/project-delete-check.json"
+                                : query instanceof ResourceOverviewQuery
+                                  ? "api/projects/atlas-api/environments/production/resources/api-gateway/overview"
+                                  : query instanceof ShowResourceQuery
+                                    ? "fixtures/resource-detail.json"
+                                    : query instanceof ResourceRuntimeLogsQuery
+                                      ? "fixtures/resource-logs.json"
+                                      : query instanceof RuntimeMonitoringRollupQuery
+                                        ? "fixtures/resource-rollup.json"
+                                        : query instanceof CheckResourceDeleteSafetyQuery
+                                          ? "fixtures/resource-delete-check.json"
+                                          : query instanceof ListDeploymentsQuery
+                                            ? "fixtures/resource-deployments.json"
+                                            : undefined;
       if (!fixturePath) throw new Error(`Unexpected Dashboard query: ${query.constructor.name}`);
       return ok((await Bun.file(`${buildRoot}${fixturePath}`).json()) as T);
     },
@@ -605,6 +824,12 @@ beforeAll(async () => {
           const url = new URL(request.url);
           const pathname = url.pathname;
           apiFixtureRequests.push(pathname);
+          if (pathname === "/api/auth/public-config.js") {
+            return new Response(
+              'window.__APPALOFT_PUBLIC_CONFIG__={auth:{schemaVersion:"appaloft.auth.public-config/v1",enabled:true,provider:"better-auth",providers:[]}};',
+              { headers: { "content-type": "application/javascript; charset=utf-8" } },
+            );
+          }
           if (pathname === "/api/system-plugins/web-extensions") {
             return Response.json({
               items: extensionFixtureEnabled
@@ -697,6 +922,222 @@ afterAll(async () => {
 });
 
 describe("Dashboard foundation WebView", () => {
+  test("[DASH-AUTH-001][DASH-AUTH-002] keeps sign-in and first-admin recovery usable", async () => {
+    await using desktop = createView(1_440, 1_000);
+
+    bootstrapFixtureRequired = false;
+    await desktop.navigate(`${previewUrl}/login?next=%2Fprojects%2Fatlas-api%2Foverview`);
+    await waitFor(
+      () =>
+        desktop.evaluate<boolean>(
+          `Boolean(document.querySelector('[data-dashboard-auth="login"] form'))`,
+        ),
+      Boolean,
+    ).catch(async (error) => {
+      const diagnostics = await desktop.evaluate(
+        `({ url: location.href, body: document.body.textContent ?? '', html: document.body.innerHTML.slice(0, 1200) })`,
+      );
+      throw new Error(`${String(error)}\n${JSON.stringify({ diagnostics, apiFixtureRequests })}`);
+    });
+    expect(
+      await desktop.evaluate<number>(`document.querySelectorAll('.dashboard-shell').length`),
+    ).toBe(0);
+    expect(
+      await desktop.evaluate<number>(
+        `document.querySelectorAll('[data-dashboard-auth="login"] input').length`,
+      ),
+    ).toBe(2);
+    expect(
+      (await Bun.file(await capture(desktop, "auth-login-desktop-light")).arrayBuffer()).byteLength,
+    ).toBeGreaterThan(10_000);
+
+    bootstrapFixtureRequired = true;
+    apiFixtureCommands.length = 0;
+    await desktop.navigate(`${previewUrl}/bootstrap/auth/first-admin`);
+    await waitFor(
+      () =>
+        desktop.evaluate<boolean>(
+          `Boolean(document.querySelector('[data-dashboard-auth="first-admin"] form'))`,
+        ),
+      Boolean,
+    );
+    await desktop.evaluate(`(() => {
+      const form = document.querySelector('[data-dashboard-auth="first-admin"] form');
+      const inputs = form?.querySelectorAll('input');
+      if (!(form instanceof HTMLFormElement) || !inputs || inputs.length < 2) return false;
+      inputs[0].value = 'owner@example.test';
+      inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+      inputs[1].value = 'Owner';
+      inputs[1].dispatchEvent(new Event('input', { bubbles: true }));
+      form.requestSubmit();
+      return true;
+    })()`);
+    await waitFor(async () => apiFixtureCommands.includes("BootstrapFirstAdminCommand"), Boolean);
+    await waitFor(
+      () => desktop.evaluate<string>(`document.body.textContent ?? ''`),
+      (content) => content.includes("Your control plane is ready"),
+    );
+    expect(
+      (await Bun.file(await capture(desktop, "auth-first-admin-desktop-light")).arrayBuffer())
+        .byteLength,
+    ).toBeGreaterThan(10_000);
+
+    await using mobile = createView(390, 844);
+    bootstrapFixtureRequired = false;
+    await mobile.navigate(`${previewUrl}/login`);
+    await waitFor(
+      () => mobile.evaluate<boolean>(`Boolean(document.querySelector('[data-dashboard-auth]'))`),
+      Boolean,
+    );
+    const dimensions = await mobile.evaluate<{ clientWidth: number; scrollWidth: number }>(
+      `({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth })`,
+    );
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+    expect(
+      (await Bun.file(await capture(mobile, "auth-login-mobile-light")).arrayBuffer()).byteLength,
+    ).toBeGreaterThan(10_000);
+  }, 20_000);
+
+  test("[DASH-ROUTE-004][DASH-ROUTE-005][DASH-OWN-008] makes every Workspace and Project destination usable", async () => {
+    await using view = createView(1_440, 1_000);
+
+    for (const fixture of [
+      {
+        name: "workspace-infrastructure-desktop-light",
+        path: "/infrastructure",
+        selector: "[data-workspace-infrastructure]",
+        operation: "/api/rpc/servers/list",
+      },
+      {
+        name: "workspace-activity-desktop-light",
+        path: "/activity",
+        selector: "[data-workspace-activity]",
+        operation: "/api/rpc/operatorWork/list",
+      },
+      {
+        name: "workspace-marketplace-desktop-light",
+        path: "/marketplace",
+        selector: "[data-workspace-marketplace]",
+        operation: "/api/rpc/blueprints/list",
+      },
+      {
+        name: "workspace-settings-desktop-light",
+        path: "/settings",
+        selector: "[data-workspace-settings]",
+        operation: "/api/rpc/organizations/currentContext",
+      },
+      {
+        name: "project-deployments-desktop-light",
+        path: "/projects/atlas-api/deployments?environment=production",
+        selector: "[data-project-deployments]",
+        operation: "/api/rpc/deployments/list",
+      },
+      {
+        name: "project-observability-desktop-light",
+        path: "/projects/atlas-api/observability?environment=production",
+        selector: "[data-project-observability]",
+        operation: "/api/rpc/runtimeMonitoring/rollup",
+      },
+      {
+        name: "project-settings-desktop-light",
+        path: "/projects/atlas-api/settings?environment=production",
+        selector: "[data-project-settings]",
+        operation: "/api/rpc/projects/show",
+      },
+    ] as const) {
+      apiFixtureRequests.length = 0;
+      await navigateWithTheme(view, fixture.path, "light");
+      await waitFor(
+        () => view.evaluate<boolean>(`Boolean(document.querySelector('${fixture.selector}'))`),
+        Boolean,
+      );
+      expect(apiFixtureRequests).toContain(fixture.operation);
+      expect(
+        await view.evaluate<number>(
+          `Array.from(document.querySelectorAll('nav[aria-label="Workspace"] a')).filter((item) => item.getClientRects().length > 0).length`,
+        ),
+      ).toBeLessThanOrEqual(5);
+      expect(await view.evaluate<string>(`document.body.textContent ?? ''`)).not.toContain(
+        "Coming soon",
+      );
+      const dimensions = await view.evaluate<{ clientWidth: number; scrollWidth: number }>(
+        `({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth })`,
+      );
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+      expect(
+        (await Bun.file(await capture(view, fixture.name)).arrayBuffer()).byteLength,
+      ).toBeGreaterThan(10_000);
+    }
+  }, 20_000);
+
+  test("[DASH-OWN-008][DASH-OWN-009] dispatches accepted Workspace, Project, and Resource commands", async () => {
+    await using view = createView(1_440, 1_000);
+
+    await navigateWithTheme(view, "/infrastructure", "light");
+    apiFixtureCommands.length = 0;
+    await view.evaluate(
+      `document.querySelector('[data-workspace-infrastructure] button')?.click()`,
+    );
+    await waitFor(
+      () => view.evaluate<boolean>(`Boolean(document.querySelector('[data-create-server-form]'))`),
+      Boolean,
+    );
+    await view.evaluate(
+      `(() => { const form = document.querySelector('[data-create-server-form]'); const inputs = form?.querySelectorAll('input'); if (!(form instanceof HTMLFormElement) || !inputs || inputs.length < 2) return false; inputs[0].value = 'Staging edge'; inputs[0].dispatchEvent(new Event('input', { bubbles: true })); inputs[1].value = 'staging.example.test'; inputs[1].dispatchEvent(new Event('input', { bubbles: true })); form.requestSubmit(); return true; })()`,
+    );
+    await waitFor(async () => apiFixtureCommands.includes("RegisterServerCommand"), Boolean);
+
+    await navigateWithTheme(view, "/projects/atlas-api/overview?environment=production", "light");
+    apiFixtureCommands.length = 0;
+    await view.evaluate(`document.querySelector('[data-add-resource]')?.click()`);
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(`Boolean(document.querySelector('[data-create-resource-form]'))`),
+      Boolean,
+    );
+    await view.evaluate(
+      `(() => { const form = document.querySelector('[data-create-resource-form]'); const input = form?.querySelector('input[name="name"]'); if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement)) return false; input.value = 'billing-worker'; input.dispatchEvent(new Event('input', { bubbles: true })); form.requestSubmit(); return true; })()`,
+    );
+    await waitFor(async () => apiFixtureCommands.includes("CreateResourceCommand"), Boolean);
+    expect(apiFixtureCommands).toEqual(["CreateResourceCommand"]);
+  }, 15_000);
+
+  test("[DASH-OWN-010] keeps Agent contextual without owning its execution lifecycle", async () => {
+    await using view = createView(1_440, 1_000);
+    await navigateWithTheme(
+      view,
+      "/projects/atlas-api/observability?environment=production",
+      "light",
+    );
+    await view.evaluate(
+      `Array.from(document.querySelectorAll('header button')).find((item) => item.textContent?.includes('Agent'))?.click()`,
+    );
+    await waitFor(
+      () => view.evaluate<boolean>(`Boolean(document.querySelector('[data-contextual-agent]'))`),
+      Boolean,
+    );
+    await view.evaluate(
+      `Array.from(document.querySelectorAll('[data-contextual-agent] button')).find((item) => item.textContent?.includes('Summarize deployment health'))?.click()`,
+    );
+
+    const agent = await view.evaluate<{
+      disabledActionCount: number;
+      linkCount: number;
+      prompt: string;
+    }>(`(() => ({
+      disabledActionCount: Array.from(document.querySelectorAll('[data-contextual-agent] button')).filter((item) => item.hasAttribute('disabled')).length,
+      linkCount: document.querySelectorAll('[data-contextual-agent] a').length,
+      prompt: document.querySelector('#dashboard-agent-prompt')?.value ?? '',
+    }))()`);
+
+    expect(agent.disabledActionCount).toBe(0);
+    expect(agent.linkCount).toBe(0);
+    expect(agent.prompt).toBe("Summarize deployment health");
+    expect(
+      (await Bun.file(await capture(view, "project-agent-desktop-light")).arrayBuffer()).byteLength,
+    ).toBeGreaterThan(10_000);
+  });
+
   test("[DASH-OWN-009] dispatches the shared Project command from the create path", async () => {
     await using view = createView(1_440, 1_000);
     await navigateWithTheme(view, "/projects", "light");
@@ -759,7 +1200,11 @@ describe("Dashboard foundation WebView", () => {
       () => view.evaluate<number>(`document.querySelectorAll('[data-project-card]').length`),
       (count) => count === 13,
     );
-    expect(apiFixtureRequests.filter((path) => path.startsWith("/api/"))).toHaveLength(2);
+    expect(
+      apiFixtureRequests.filter(
+        (path) => path.startsWith("/api/") && path !== "/api/auth/public-config.js",
+      ),
+    ).toHaveLength(2);
     expect(
       apiFixtureRequests.filter((path) => path === "/api/rpc/projects/listSummaries"),
     ).toHaveLength(1);
@@ -781,7 +1226,11 @@ describe("Dashboard foundation WebView", () => {
       await view.evaluate<number>(`document.querySelectorAll('a[href*="/resources/"]').length`),
     ).toBeLessThanOrEqual(50);
     expect(await view.evaluate<string>(`document.body.textContent ?? ''`)).toContain("service-050");
-    expect(apiFixtureRequests.filter((path) => path.startsWith("/api/"))).toHaveLength(2);
+    expect(
+      apiFixtureRequests.filter(
+        (path) => path.startsWith("/api/") && path !== "/api/auth/public-config.js",
+      ),
+    ).toHaveLength(2);
     expect(
       apiFixtureRequests.filter((path) => path === "/api/rpc/projects/environmentOverview"),
     ).toHaveLength(1);
@@ -795,7 +1244,11 @@ describe("Dashboard foundation WebView", () => {
       () => view.evaluate<string>(`document.body.textContent ?? ''`),
       (content) => content.includes("dep_atlas"),
     );
-    expect(apiFixtureRequests.filter((path) => path.startsWith("/api/"))).toHaveLength(3);
+    expect(
+      apiFixtureRequests.filter(
+        (path) => path.startsWith("/api/") && path !== "/api/auth/public-config.js",
+      ),
+    ).toHaveLength(3);
     expect(
       apiFixtureRequests.filter((path) => path === "/api/rpc/resources/overview"),
     ).toHaveLength(1);
@@ -1209,6 +1662,42 @@ describe("Dashboard foundation WebView", () => {
     expect(
       (await Bun.file(await capture(view, "projects-mobile-dark")).arrayBuffer()).byteLength,
     ).toBeGreaterThan(10_000);
+
+    for (const fixture of [
+      {
+        path: "/marketplace",
+        selector: "[data-workspace-marketplace]",
+        name: "workspace-marketplace-mobile-dark",
+      },
+      {
+        path: "/settings",
+        selector: "[data-workspace-settings]",
+        name: "workspace-settings-mobile-dark",
+      },
+      {
+        path: "/projects/atlas-api/observability?environment=production",
+        selector: "[data-project-observability]",
+        name: "project-observability-mobile-dark",
+      },
+      {
+        path: "/projects/atlas-api/settings?environment=production",
+        selector: "[data-project-settings]",
+        name: "project-settings-mobile-dark",
+      },
+    ] as const) {
+      await navigateWithTheme(view, fixture.path, "dark");
+      await waitFor(
+        () => view.evaluate<boolean>(`Boolean(document.querySelector('${fixture.selector}'))`),
+        Boolean,
+      );
+      const dimensions = await view.evaluate<{ clientWidth: number; scrollWidth: number }>(
+        `({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth })`,
+      );
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+      expect(
+        (await Bun.file(await capture(view, fixture.name)).arrayBuffer()).byteLength,
+      ).toBeGreaterThan(10_000);
+    }
 
     await navigateWithTheme(
       view,
