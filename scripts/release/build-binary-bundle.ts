@@ -27,6 +27,9 @@ await createBinaryBundle({
   outDir,
   target,
   version,
+  ...(stringArg(args, "console-preset")
+    ? { consolePreset: stringArg(args, "console-preset") }
+    : {}),
   ...(stringArg(args, "workspace-tui-binary")
     ? { workspaceTuiBinaryPath: resolve(stringArg(args, "workspace-tui-binary") ?? "") }
     : {}),

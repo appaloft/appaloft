@@ -1,5 +1,12 @@
 # Project Resource Console Workflow Spec
 
+> Presentation scope: the ownership rules in this workflow remain normative. The persistent
+> Project -> Resource sidebar, legacy tab placement, and compact navigation read shape govern
+> `apps/web` only. The proposed `apps/dashboard` replacement is governed by
+> [ADR-126](../decisions/ADR-126-contextual-dashboard-and-web-route-boundary.md),
+> [Spec 147](../specs/147-contextual-dashboard-app/spec.md), and the
+> [Contextual Dashboard Test Matrix](../testing/contextual-dashboard-test-matrix.md).
+
 ## Normative Contract
 
 The Web console must present project, resource, and deployment ownership as:
@@ -17,6 +24,7 @@ The project surface is a resource collection surface. The resource surface is th
 This workflow inherits:
 
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
+- [ADR-126: Contextual Dashboard And Web Route Boundary](../decisions/ADR-126-contextual-dashboard-and-web-route-boundary.md)
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)

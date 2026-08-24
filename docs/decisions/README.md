@@ -142,6 +142,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-123: First Deploy Login Fold And Agent-Env Guard](./ADR-123-first-deploy-login-fold-and-agent-env-guard.md) | Accepted | First Cloud `deploy` folds existing browser login; coding-agent/CI/non-TTY doors print a plan and do not mutate without `--yes`. |
 | [ADR-124: Sandbox Display Name](./ADR-124-sandbox-display-name.md) | Accepted | Persist a readable display name on Sandbox; user surfaces never paint `sbx_*`; ids stay `sbx_*`. Adjective-noun kebab is Appaloft's generator, not a Railway formula. |
 | [ADR-125: Occupancy Agent Identity And Project Binding](./ADR-125-occupancy-agent-and-project-binding.md) | Accepted | User-facing occupancy is Agent with kebab name; Binding rebinds default Project; Resource remains the Service. |
+| [ADR-126: Contextual Dashboard And Web Route Boundary](./ADR-126-contextual-dashboard-and-web-route-boundary.md) | Accepted | Introduces a public parallel Dashboard with owner-scoped navigation, bounded summary projections, additive scoped extension metadata, versioned design presets, and intentionally breaking pre-1.0 Web routes. |
 
 ## Authoring Rules
 

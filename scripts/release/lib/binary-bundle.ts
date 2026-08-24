@@ -10,6 +10,7 @@ import {
   runNothrow,
 } from "./release-utils";
 import { createStaticAssetArchive } from "./static-asset-archive";
+import { resolveConsoleSurface } from "./console-surface";
 import { detectHostReleaseBinaryTarget, type ReleaseBinaryTarget } from "./targets";
 
 function toImportSpecifier(fromFile: string, toFile: string): string {
@@ -204,11 +205,16 @@ export async function createBinaryBundle(input: {
   target?: ReleaseBinaryTarget;
   version?: string;
   workspaceTuiBinaryPath?: string;
+  consolePreset?: string;
 }): Promise<void> {
   const target = input.target ?? detectHostReleaseBinaryTarget();
   const version = input.version ?? process.env.APPALOFT_APP_VERSION ?? "0.1.0";
-  const webRoot = join(input.root, "apps", "web");
-  const webBuildDir = join(webRoot, "build");
+  const consoleSurface = resolveConsoleSurface({
+    root: input.root,
+    preset: input.consolePreset ?? process.env.APPALOFT_CONSOLE_PRESET,
+  });
+  const webRoot = consoleSurface.appRoot;
+  const webBuildDir = consoleSurface.buildDir;
   const docsRoot = join(input.root, "apps", "docs");
   const docsBuildDir = join(docsRoot, "dist");
   const binaryPath = join(input.outDir, target.executableName);
