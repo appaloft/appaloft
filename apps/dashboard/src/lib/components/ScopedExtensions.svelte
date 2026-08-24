@@ -6,23 +6,22 @@
   import {
     activeScopedExtensions,
     isConsoleExtensionPageDocumentV1,
+    type ActiveScopedExtension,
     type ConsoleExtensionPageDocumentV1,
   } from "$lib/extensions";
   import { dashboardClient } from "$lib/data-client";
+  import { dashboardI18n as i18n } from "$lib/i18n.svelte";
   import type { DashboardRoute } from "$lib/navigation";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
   let { route }: { route: DashboardRoute } = $props();
 
   type ExtensionResponse = { items?: SystemPluginWebExtension[] };
-  type LoadedDocument = {
-    key: string;
-    document: ConsoleExtensionPageDocumentV1;
-  };
-
   let loading = $state(false);
   let failed = $state(false);
-  let documents = $state<LoadedDocument[]>([]);
+  let items = $state<ActiveScopedExtension[]>([]);
+  let activeKey = $state("");
+  let document = $state<ConsoleExtensionPageDocumentV1>();
   let Renderer = $state<Component<{ document: ConsoleExtensionPageDocumentV1 }> | null>(null);
   let requestVersion = 0;
 
@@ -75,6 +74,37 @@
     return pending;
   }
 
+  function extensionLabel(item: ActiveScopedExtension): string {
+    return item.extension.localizations?.[i18n.locale]?.title ?? item.extension.title;
+  }
+
+  async function loadDocument(item: ActiveScopedExtension, version: number): Promise<void> {
+    const response = await fetch(item.pageEndpoint ?? "/", { credentials: "same-origin" });
+    if (!response.ok) throw new Error(`Extension page returned ${response.status}`);
+    const payload: unknown = await response.json();
+    if (!isConsoleExtensionPageDocumentV1(payload)) {
+      throw new Error("Extension page returned an unsupported document");
+    }
+    if (version !== requestVersion || activeKey !== item.navigation.key) return;
+    document = payload;
+    if (!Renderer) Renderer = (await import("./ExtensionPageRenderer.svelte")).default;
+  }
+
+  async function select(item: ActiveScopedExtension): Promise<void> {
+    const version = ++requestVersion;
+    activeKey = item.navigation.key;
+    document = undefined;
+    loading = true;
+    failed = false;
+    try {
+      await loadDocument(item, version);
+    } catch {
+      if (version === requestVersion) failed = true;
+    } finally {
+      if (version === requestVersion) loading = false;
+    }
+  }
+
   async function load(): Promise<void> {
     if (!browser) return;
     const version = ++requestVersion;
@@ -103,30 +133,20 @@
           })),
         )
       ).filter(({ visible }) => visible);
-      const loaded = await Promise.all(
-        visible
-          .filter(({ contribution }) => Boolean(contribution.pageEndpoint))
-          .map(async ({ contribution }) => {
-            const response = await fetch(contribution.pageEndpoint ?? "/", {
-              credentials: "same-origin",
-            });
-            if (!response.ok) throw new Error(`Extension page returned ${response.status}`);
-            return {
-              key: contribution.navigation.key,
-              document: await response.json(),
-            };
-          }),
-      );
       if (version !== requestVersion) return;
-      documents = loaded.filter(
-        (item): item is LoadedDocument => isConsoleExtensionPageDocumentV1(item.document),
-      );
-      if (documents.length && !Renderer) {
-        Renderer = (await import("./ExtensionPageRenderer.svelte")).default;
+      items = visible
+        .map(({ contribution }) => contribution)
+        .filter((contribution) => Boolean(contribution.pageEndpoint));
+      const selected = items.find((item) => item.navigation.key === activeKey) ?? items[0];
+      activeKey = selected?.navigation.key ?? "";
+      document = undefined;
+      if (selected) {
+        await loadDocument(selected, version);
       }
     } catch {
       if (version === requestVersion) {
-        documents = [];
+        items = [];
+        document = undefined;
         failed = true;
       }
     } finally {
@@ -143,7 +163,7 @@
   });
 </script>
 
-{#if loading && documents.length === 0}
+{#if loading && items.length === 0}
   <div class="mt-4 flex items-center gap-2 rounded-[12px] border border-divider bg-surface p-4 text-xs text-muted-foreground">
     <LoaderCircle class="size-4 animate-spin" />
     Loading extensions
@@ -153,10 +173,28 @@
     <TriangleAlert class="size-4 text-destructive" />
     Extension content is unavailable.
   </div>
-{:else if Renderer}
-  <div class="mt-4 space-y-4" data-scoped-extensions>
-    {#each documents as item (item.key)}
-      <Renderer document={item.document} />
-    {/each}
+{:else if items.length > 0}
+  <div class="mt-4" data-scoped-extensions>
+    {#if items.length > 1}
+      <section class="mb-4 rounded-[16px] border border-divider bg-surface p-2 sm:flex sm:items-center sm:gap-2" aria-label={i18n.locale === "zh-CN" ? "Cloud 设置分类" : "Cloud settings sections"}>
+        <p class="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground sm:mr-auto">{i18n.locale === "zh-CN" ? "Cloud 设置" : "Cloud settings"}</p>
+        <div class="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
+          {#each items as item (item.navigation.key)}
+            <button
+              type="button"
+              data-scoped-extension={item.navigation.key}
+              class={`shrink-0 rounded-[9px] px-3 py-2 text-xs font-medium transition-colors ${activeKey === item.navigation.key ? "bg-surface-selected text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              aria-pressed={activeKey === item.navigation.key}
+              onclick={() => void select(item)}
+            >{extensionLabel(item)}</button>
+          {/each}
+        </div>
+      </section>
+    {/if}
+    {#if loading}
+      <div class="flex min-h-40 items-center justify-center rounded-[16px] border border-divider bg-surface text-xs text-muted-foreground"><LoaderCircle class="mr-2 size-4 animate-spin" />{i18n.locale === "zh-CN" ? "加载 Cloud 设置…" : "Loading Cloud settings…"}</div>
+    {:else if Renderer && document}
+      <Renderer {document} />
+    {/if}
   </div>
 {/if}

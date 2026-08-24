@@ -53,6 +53,7 @@ const apiFixtureRequests: string[] = [];
 const dashboardInfrastructureRequests = new Set([
   "/api/auth/public-config.js",
   "/api/auth/session",
+  "/api/rpc/organizations/currentContext",
 ]);
 
 function businessApiRequests(): string[] {
@@ -62,6 +63,9 @@ function businessApiRequests(): string[] {
 }
 const apiFixtureCommands: string[] = [];
 const apiFixtureQueries: string[] = [];
+function destinationQueries(): string[] {
+  return apiFixtureQueries.filter((name) => name !== "GetCurrentOrganizationContextQuery");
+}
 let extensionFixtureEnabled = false;
 let bootstrapFixtureRequired = false;
 
@@ -1412,11 +1416,11 @@ describe("Dashboard foundation WebView", () => {
       `${previewUrl}/projects/atlas-api/resources/api-gateway/logs-metrics?environment=production&view=list`,
     );
     await waitFor(
-      async () => apiFixtureQueries.length,
+      async () => destinationQueries().length,
       (count) => count >= 3,
     );
-    expect(apiFixtureQueries).toHaveLength(3);
-    expect(apiFixtureQueries).toEqual(
+    expect(destinationQueries()).toHaveLength(3);
+    expect(destinationQueries()).toEqual(
       expect.arrayContaining([
         "ProjectEnvironmentOverviewQuery",
         "ResourceRuntimeLogsQuery",
