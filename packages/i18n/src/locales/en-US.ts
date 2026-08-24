@@ -210,6 +210,93 @@ export const enUS = {
     },
   },
   console: {
+    dashboard: {
+      nav: {
+        projects: "Projects",
+        infrastructure: "Infrastructure",
+        activity: "Activity",
+        marketplace: "Marketplace",
+        settings: "Settings",
+        overview: "Overview",
+        deployments: "Deployments",
+        observability: "Observability",
+        configuration: "Configuration",
+        logsMetrics: "Logs & Metrics",
+        networking: "Networking",
+      },
+      actions: {
+        addResource: "Add resource",
+        closeResource: "Close resource",
+        moreOptions: "More options",
+        newProject: "New project",
+        notifications: "Notifications",
+        openAgent: "Open contextual agent",
+        projectNavigation: "Project navigation",
+        resizeResourcePanel: "Resize Resource panel",
+        returnProjects: "Back to projects",
+        searchProjects: "Search projects",
+        viewAllActivity: "View all activity",
+        viewLogs: "View logs",
+      },
+      shell: {
+        allSystemsOperational: "All systems operational",
+        brandSubtitle: "Deployment workspace",
+        foundationPreview: "Foundation preview",
+        localPreview: "Local preview · dashboard-v2",
+        projectScope: "Project",
+        previewNotice: "Preview data illustrates the new navigation and visual system.",
+        workspaceScope: "Workspace",
+        workspaceName: "Northstar workspace",
+      },
+      projects: {
+        title: "Projects",
+        description:
+          "Your deployable systems, with attention and activity kept close to the owner.",
+        healthy: "Healthy",
+        needsAttention: "Needs attention",
+        resourceCount: "{{count}} resources",
+        lastDeployed: "Deployed {{time}}",
+        quietTitle: "Everything is steady",
+        quietDescription: "No failed deployments or unhealthy resources need your attention.",
+      },
+      project: {
+        description: "Resources in {{environment}}, grouped around the work you do most.",
+        environment: "Environment",
+        list: "List",
+        topology: "Topology",
+        searchResources: "Search resources",
+        resourceHealth: "Resource health",
+        recentDeployments: "Recent deployments",
+        resourceSummary: "{{count}} resources · {{environment}}",
+        healthySummary: "{{healthy}} / {{total}} healthy",
+      },
+      resource: {
+        description: "Runtime state and deployment context stay owned by this resource.",
+        activeDeployment: "Active deployment",
+        deploymentSuccessful: "Deployment successful",
+        publicAccess: "Public access",
+        runtime: "Runtime",
+        onlineReplicas: "Online · {{count}} replica",
+        updated: "Updated {{time}}",
+      },
+      notFound: {
+        title: "This route has no Dashboard owner.",
+        description: "Legacy route compatibility is intentionally outside this migration.",
+      },
+      destination: {
+        infrastructure: "Servers and shared dependencies, without mixing them into project work.",
+        activity: "A focused stream of deployments and operator actions across the workspace.",
+        marketplace:
+          "Blueprints and extensions that add capabilities without expanding global navigation.",
+        settings: "Workspace, organization, account, and contributed settings in one owner scope.",
+        projectDeployments:
+          "A bounded project deployment rollup with every mutation returning to its resource.",
+        projectObservability:
+          "Health and activity summaries that lead directly to the affected resource.",
+        projectSettings:
+          "Project lifecycle and environment management in the active project context.",
+      },
+    },
     docsHelp: {
       docsHome: "The docs center is the entry point for Appaloft concepts, tasks, and references.",
       firstAdminBootstrap:

@@ -1,13 +1,19 @@
 # Web Console Redesign Plan
 
-> Status: Design Round with first implementation pass in `apps/web`.
+> Status: Legacy `apps/web` design/implementation record. It does not govern the proposed
+> `apps/dashboard` replacement.
 >
 > Scope: `apps/web` information architecture, interaction grammar, layout rules, and future screen
-> generation guidance.
+> generation guidance until legacy removal.
 >
 > This document does not change business behavior. It defines how the Web console should present
 > existing Appaloft operations and how future Web work should choose navigation, tabs, cards,
 > panels, tables, terminals, and help surfaces.
+>
+> Replacement authority: [ADR-126](../decisions/ADR-126-contextual-dashboard-and-web-route-boundary.md),
+> [Spec 147](../specs/147-contextual-dashboard-app/spec.md), and the
+> [Contextual Dashboard Test Matrix](../testing/contextual-dashboard-test-matrix.md). Dashboard is
+> intentionally free to replace these routes, menus, density rules, tabs, and surface recipes.
 
 ## Governing Inputs
 

@@ -14,6 +14,19 @@
 ## Release Gate Checklist
 
 This roadmap is the release gate for Appaloft versions before `1.0.0`.
+
+Dashboard replacement track:
+
+- [x] Confirm [ADR-126](./decisions/ADR-126-contextual-dashboard-and-web-route-boundary.md) and
+  [Spec 147](./specs/147-contextual-dashboard-app/spec.md) before creating Code tickets.
+- [ ] Deliver a parallel public `apps/dashboard` foundation and the real
+  `Projects -> Project/Environment -> Resource` closed loop before opt-in beta.
+- [ ] Require bounded owner summaries, no list N+1, versioned Dashboard v2 design governance,
+  light/dark responsive visual coverage, accessibility, and numeric performance budgets.
+- [ ] Make Dashboard default only after Projects, Infrastructure, Activity, Marketplace, Settings,
+  and core Project/Resource destinations are usable. Legacy route/feature parity and redirects are
+  not gates; the breaking route change still requires bilingual docs and release notes.
+- [ ] Keep Topology behind 10/50/100 Resource benchmarks and retain Overview/List as a fallback.
 - [x] Keep roadmap entries in Markdown todo format so completed and incomplete work is visible.
 - [x] Keep external baseline research summarized without naming other products in this document.
 - [x] Before every release, compare implementation, operation catalog, specs, tests, and migration

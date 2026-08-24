@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "appaloft.dashboard-foundation-evidence/v1",
+  "capturedAt": "2026-08-24T07:15:00Z",
+  "machine": {
+    "platform": "darwin-arm64",
+    "bun": "1.4.0",
+    "vite": "8.1.0",
+    "measurement": "sum of individually gzip-compressed JavaScript files in each static build"
+  },
+  "bundle": {
+    "legacy-console-v1": {
+      "buildDirectory": "apps/web/build/_app/immutable",
+      "javascriptFiles": 145,
+      "gzipBytes": 908951
+    },
+    "dashboard-v2": {
+      "buildDirectory": "apps/dashboard/build/_app/immutable",
+      "javascriptFiles": 14,
+      "gzipBytes": 211496,
+      "blockingBudgetBytes": 307200
+    },
+    "reductionPercent": 76.7
+  },
+  "fixtures": {
+    "resourceCounts": [1, 10, 50, 100],
+    "initialMountedRowLimit": 50,
+    "topologyEnabled": false
+  },
+  "visualAcceptance": {
+    "browser": "Chromium via Playwright CLI",
+    "desktopViewport": "1440x1000",
+    "mobileViewport": "390x844",
+    "themes": ["light", "dark"],
+    "routes": [
+      "/projects",
+      "/projects/atlas-api/overview?environment=production",
+      "/projects/atlas-api/resources/api-gateway/overview?environment=production&view=list",
+      "/patterns"
+    ],
+    "outcome": "pass"
+  },
+  "automatedWebViewEvidence": {
+    "command": "bun run --cwd apps/dashboard test:e2e:webview",
+    "artifactDirectory": "/private/tmp/appaloft-dashboard-evidence",
+    "fixtures": [
+      "projects-desktop-light.png",
+      "patterns-desktop-dark.png",
+      "projects-mobile-dark.png",
+      "resource-mobile-dark.png"
+    ]
+  },
+  "productDataRequestTiming": {
+    "status": "not-comparable-in-foundation-preview",
+    "reason": "Issue 1423 intentionally has no real data or summary queries. Same-seed product-data request and p95 comparison begins with issue 1424. No zero-request preview measurement is presented as control-plane evidence."
+  }
+}

@@ -1,0 +1,144 @@
+@import "./fonts.css";
+@import "./tailwind.css";
+
+:root[data-console-preset="dashboard-v2"],
+[data-console-preset="dashboard-v2"] {
+  --appaloft-font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --appaloft-font-mono:
+    "IBM Plex Mono", "SFMono-Regular", "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  --appaloft-font-serif: "Fraunces", ui-serif, Georgia, serif;
+  --background: #f7f7f7;
+  --foreground: #242322;
+  --card: #ffffff;
+  --card-foreground: #242322;
+  --popover: #ffffff;
+  --popover-foreground: #242322;
+  --primary: #4e84ff;
+  --primary-foreground: #ffffff;
+  --secondary: #f0f0ef;
+  --secondary-foreground: #343331;
+  --muted: #f0f0ef;
+  --muted-foreground: #6f6d69;
+  --accent: #edf3ff;
+  --accent-foreground: #2857c8;
+  --destructive: oklch(0.6 0.2 27);
+  --destructive-foreground: #ffffff;
+  --border: #e4e3e1;
+  --input: #d2d0cd;
+  --ring: #4e84ff;
+  --canvas: #f7f7f7;
+  --surface: #ffffff;
+  --surface-subtle: #f3f3f2;
+  --surface-raised: #fbfbfa;
+  --surface-overlay: #ffffff;
+  --surface-selected: #edf3ff;
+  --divider: #e4e3e1;
+  --control: #d2d0cd;
+  --chart-1: #4e84ff;
+  --chart-2: oklch(0.58 0.16 145);
+  --chart-3: oklch(0.6 0.2 27);
+  --chart-4: oklch(0.67 0.15 75);
+  --chart-5: #86a9ff;
+  --sidebar: #f3f3f2;
+  --sidebar-foreground: #353432;
+  --sidebar-primary: #4e84ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8e7e5;
+  --sidebar-accent-foreground: #242322;
+  --sidebar-border: #dfddda;
+  --sidebar-ring: #4e84ff;
+  --radius: 0.625rem;
+  --radius-card: 1rem;
+  --radius-panel: 1.125rem;
+  --shadow-overlay: 0 20px 50px -24px rgb(39 37 34 / 0.3), 0 8px 24px -18px rgb(39 37 34 / 0.18);
+}
+
+:root[data-console-preset="dashboard-v2"].dark,
+[data-console-preset="dashboard-v2"].dark {
+  --background: #181716;
+  --foreground: #f2f1ef;
+  --card: #211f1e;
+  --card-foreground: #f2f1ef;
+  --popover: #292725;
+  --popover-foreground: #f2f1ef;
+  --primary: #75a0ff;
+  --primary-foreground: #101522;
+  --secondary: #2c2a28;
+  --secondary-foreground: #f0efed;
+  --muted: #2b2927;
+  --muted-foreground: #aaa6a1;
+  --accent: #273550;
+  --accent-foreground: #edf3ff;
+  --destructive: oklch(0.66 0.19 27);
+  --destructive-foreground: #ffffff;
+  --border: #393633;
+  --input: #494541;
+  --ring: #75a0ff;
+  --canvas: #181716;
+  --surface: #211f1e;
+  --surface-subtle: #2a2826;
+  --surface-raised: #262422;
+  --surface-overlay: #292725;
+  --surface-selected: #273550;
+  --divider: #393633;
+  --control: #494541;
+  --chart-1: #75a0ff;
+  --chart-2: oklch(0.7 0.16 145);
+  --chart-3: oklch(0.7 0.18 27);
+  --chart-4: oklch(0.75 0.15 75);
+  --chart-5: #9ab9ff;
+  --sidebar: #1d1c1b;
+  --sidebar-foreground: #e9e7e4;
+  --sidebar-primary: #75a0ff;
+  --sidebar-primary-foreground: #101522;
+  --sidebar-accent: #302e2c;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #35322f;
+  --sidebar-ring: #75a0ff;
+  --shadow-overlay: 0 24px 60px -24px rgb(0 0 0 / 0.7), 0 8px 26px -18px rgb(0 0 0 / 0.65);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    background: var(--background);
+    font-family: var(--appaloft-font-sans);
+  }
+
+  body {
+    min-width: 20rem;
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

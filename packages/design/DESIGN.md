@@ -9,7 +9,9 @@ define separate palettes, typography, spacing, surface grammar, or component rul
 
 Consumers:
 
-- `apps/web`: product console and reference implementation.
+- `apps/web`: legacy product console and `legacy-console-v1` reference during migration.
+- proposed `apps/dashboard`: future product console and `dashboard-v2` reference implementation
+  governed by Spec 147.
 - `apps/docs`: public documentation, styled to match the console.
 - future `www`: product website, expected to import the same tokens and intentionally layer
   marketing composition on top.
@@ -46,6 +48,28 @@ Deployment Target / Server -> Credential -> Destination
 Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
 ```
 
+## Versioned Console Presets
+
+The current runtime token implementation remains `legacy-console-v1` until Spec 147 enters Code
+Round. Its compact 2px control corners, 4px panel corners, dense tables, and persistent resource-tree
+navigation must not be used as visual authority for new Dashboard screens.
+
+The proposed `dashboard-v2` preset is governed by
+[ADR-126](../../docs/decisions/ADR-126-contextual-dashboard-and-web-route-boundary.md) and
+[Spec 147](../../docs/specs/147-contextual-dashboard-app/spec.md). Its target grammar is:
+
+- near-white neutral Light canvas and complete warm-charcoal Dark canvas;
+- Appaloft blue as the only primary accent;
+- 4px spacing base, 24-32px page/section spacing, and 20-24px card padding;
+- 40px normal controls, 10px control radius, 14-16px card radius, and 16-18px panel radius;
+- ordinary surfaces separated by fill/space without shadow; elevation reserved for overlays;
+- body text at least 14px, metadata 12-13px, and mono only for machine values;
+- 150-250ms explanatory motion with complete reduced-motion behavior.
+
+During parallel migration the two presets are explicit and no consumer may silently combine their
+radius, spacing, surface, or navigation recipes. `dashboard-v2` becomes the canonical console
+preset only after the default-cutover gate; legacy removal is a separate slice.
+
 ## Color Roles
 
 - Console canvas: near-neutral structural gray `#f7f7f8` for the workspace outside object panels. It must
@@ -74,16 +98,16 @@ Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
 Every light surface follows one semantic elevation ladder. The roles are available as CSS variables
 and Tailwind v4 colors; consumers must choose by role rather than sampling a nearby gray:
 
-| Role | Tailwind utility | Purpose |
-| --- | --- | --- |
-| Canvas | `bg-canvas` | Page or workspace floor outside owned content. |
-| Surface | `bg-surface` | Cards, tables, forms, and primary content panels. |
-| Subtle surface | `bg-surface-subtle` | A low-emphasis subsection inside an owning surface. |
-| Raised surface | `bg-surface-raised` | Sticky or elevated content that remains in the page flow. |
-| Overlay surface | `bg-surface-overlay` | Dropdowns, select menus, popovers, sheets, and dialogs. |
+| Role             | Tailwind utility      | Purpose                                                     |
+| ---------------- | --------------------- | ----------------------------------------------------------- |
+| Canvas           | `bg-canvas`           | Page or workspace floor outside owned content.              |
+| Surface          | `bg-surface`          | Cards, tables, forms, and primary content panels.           |
+| Subtle surface   | `bg-surface-subtle`   | A low-emphasis subsection inside an owning surface.         |
+| Raised surface   | `bg-surface-raised`   | Sticky or elevated content that remains in the page flow.   |
+| Overlay surface  | `bg-surface-overlay`  | Dropdowns, select menus, popovers, sheets, and dialogs.     |
 | Selected surface | `bg-surface-selected` | Current choice, active navigation, or selected record only. |
-| Divider | `border-divider` | Passive panel and record boundaries. |
-| Control | `border-control` | Inputs, textareas, selects, and other editable controls. |
+| Divider          | `border-divider`      | Passive panel and record boundaries.                        |
+| Control          | `border-control`      | Inputs, textareas, selects, and other editable controls.    |
 
 The console canvas and surface must never collapse to the same color. A subtle surface must be used
 inside an owning surface, not as an alternate page background. Overlays always use the overlay
@@ -118,13 +142,14 @@ identity.
 - Component styling belongs in Tailwind utility classes.
 - Global CSS is limited to design tokens, Tailwind theme mapping, base typography, and framework
   adapters.
-- Buttons are compact rectangular controls with 2px corners. Default product buttons
-  are 32px tall on desktop, use Appaloft blue for the single primary action, and avoid oversized
-  pills.
-- Panels and overlays use 4px corners. Large card-like 12-16px rounding is not part of the console
-  grammar; full pills are reserved for badges, compact status, and intentionally pill-shaped input.
-- Form controls are 32px tall by default, with a consistent 4px label-to-control gap and visible
-  input hairlines.
+- Components follow one explicit console preset. Legacy Web buttons are 32px tall with 2px corners,
+  panels use 4px corners, and form controls are 32px tall. Dashboard normal buttons and form
+  controls are 40px tall with 10px corners; cards use 14-16px corners and route-backed panels use
+  16-18px corners. No consumer may average or mix these values.
+- Appaloft blue is used for the single primary action. Full pills are reserved for badges, status,
+  and intentional filters rather than ordinary buttons or navigation.
+- Form labels keep a consistent 4px label-to-control gap and editable controls use the visible
+  control hairline in both presets.
 - Dropdown, Select, Popover, Sheet, and Dialog content share one overlay surface, divider, corner,
   and shadow treatment. Nested dropdown menus must not switch to a different ring-only style.
 - Default console borders use a quiet 1px hairline for primary panels, secondary panels, metric
@@ -150,9 +175,12 @@ identity.
 Screens must not rely on loose borders or raw `bg-background` blocks to imply ownership. Every major
 area uses one named surface:
 
-- The light Console canvas is a Supabase-like near-white `#fdfdfd`, not a blue or visible gray page
+- The legacy light Console canvas is a Supabase-like near-white `#fdfdfd`, not a blue or visible gray page
   fill. White `#ffffff` owner surfaces remain distinct through divider hairlines, spacing, and type;
   neutral `#f7f7f8` is reserved for table headers and owned subtle groups.
+- The Dashboard light canvas uses neutral `#f7f7f7` around white owner surfaces. Dashboard Dark uses
+  warm charcoal `#181716` around `#211f1e` owner surfaces and `#292725` overlays. Neither preset may
+  borrow the other's canvas or radius recipe.
 - Primary and nested sidebars use a neutral near-white surface with neutral hover/active fills.
   Appaloft blue is reserved for the active rail, icon, focus ring, or compact collapsed navigation
   marker rather than tinting the whole navigation surface.
@@ -195,8 +223,9 @@ stays inline.
 
 ### Web
 
-Web is the reference implementation. Token changes start from Web usage and then flow into Docs and
-future www.
+Legacy Web remains the `legacy-console-v1` reference during migration. The proposed Dashboard is the
+`dashboard-v2` reference after Spec 147 enters Code Round. Token changes must name their preset and
+must not silently change the other surface.
 
 Web console information architecture and interaction grammar are governed by
 [`docs/implementation/web-console-redesign-plan.md`](../../docs/implementation/web-console-redesign-plan.md).
@@ -219,4 +248,4 @@ may add composition layers, not redefine product colors or typography.
 - Copy names the product object or operation directly.
 - Avoid explaining the UI itself.
 - Avoid marketing language inside the console.
-- User-facing text in `apps/web` must go through `packages/i18n`.
+- User-facing text in `apps/web` and the proposed `apps/dashboard` must go through `packages/i18n`.

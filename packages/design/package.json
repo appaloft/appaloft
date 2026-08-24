@@ -9,6 +9,7 @@
     "./styles/tokens.css": "./styles/tokens.css",
     "./styles/tailwind.css": "./styles/tailwind.css",
     "./styles/web.css": "./styles/web.css",
+    "./styles/dashboard.css": "./styles/dashboard.css",
     "./styles/docs.css": "./styles/docs.css",
     "./styles/www.css": "./styles/www.css",
     "./assets/*": "./assets/*"

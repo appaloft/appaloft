@@ -1,5 +1,10 @@
 # Project Resource Console Test Matrix
 
+> Scope: this matrix continues to govern owner semantics and the legacy `apps/web` presentation.
+> New Dashboard route, contextual navigation, bounded summary, responsive panel, design, and
+> performance behavior is governed by the
+> [Contextual Dashboard Test Matrix](./contextual-dashboard-test-matrix.md).
+
 ## Normative Contract
 
 Project/resource console tests must verify that the Web information architecture follows resource ownership:
@@ -16,6 +21,7 @@ Project/resource console tests must verify that the Web information architecture
 This test matrix inherits:
 
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
+- [ADR-126: Contextual Dashboard And Web Route Boundary](../decisions/ADR-126-contextual-dashboard-and-web-route-boundary.md)
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)

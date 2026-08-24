@@ -7,6 +7,7 @@ describe("design package", () => {
   test("exports the product identity from the canonical design package", () => {
     expect(productIdentity.name).toBe("Appaloft");
     expect(designPackage.cssEntrypoints.web).toBe("@appaloft/design/styles/web.css");
+    expect(designPackage.cssEntrypoints.dashboard).toBe("@appaloft/design/styles/dashboard.css");
     expect(designPackage.cssEntrypoints.docs).toBe("@appaloft/design/styles/docs.css");
     expect(designPackage.cssEntrypoints.www).toBe("@appaloft/design/styles/www.css");
     expect(designPackage.assets.iconLight).toBe("@appaloft/design/assets/appaloft-icon-light.svg");
