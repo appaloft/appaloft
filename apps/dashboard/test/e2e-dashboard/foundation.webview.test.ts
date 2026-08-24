@@ -5,18 +5,23 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import {
   type AppLogger,
+  CheckResourceDeleteSafetyQuery,
   type Command,
   type CommandBus,
   CreateProjectCommand,
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  ListDeploymentsQuery,
   ListProjectSummariesQuery,
   type ProductSessionAuthorizationPort,
   ProjectEnvironmentOverviewQuery,
   type Query,
   type QueryBus,
   ResourceOverviewQuery,
+  ResourceRuntimeLogsQuery,
+  RuntimeMonitoringRollupQuery,
+  ShowResourceQuery,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 import { mountAppaloftOrpcRoutes } from "@appaloft/orpc";
@@ -30,6 +35,7 @@ let previewProcess: ReturnType<typeof Bun.spawn> | undefined;
 let apiFixtureServer: ReturnType<typeof Bun.serve> | undefined;
 const apiFixtureRequests: string[] = [];
 const apiFixtureCommands: string[] = [];
+const apiFixtureQueries: string[] = [];
 let extensionFixtureEnabled = false;
 
 async function installDashboardApiFixtures(): Promise<void> {
@@ -84,6 +90,25 @@ async function installDashboardApiFixtures(): Promise<void> {
             },
             latestActivityAt: "2026-08-24T07:00:00.000Z",
           },
+          ...Array.from({ length: 10 }, (_, index) => {
+            const sequence = index + 4;
+            const suffix = String(sequence).padStart(2, "0");
+            return {
+              id: `project-${suffix}`,
+              name: `Project ${suffix}`,
+              slug: `project-${suffix}`,
+              description: `Bounded project fixture ${suffix}`,
+              resourceCount: sequence,
+              attentionCount: sequence % 4 === 0 ? 1 : 0,
+              attentionStatus: sequence % 4 === 0 ? "attention" : "healthy",
+              defaultEnvironment: {
+                id: "production",
+                name: "Production",
+                kind: "production",
+              },
+              latestActivityAt: `2026-08-${String(24 - index).padStart(2, "0")}T06:00:00.000Z`,
+            };
+          }),
         ],
       },
     ],
@@ -121,8 +146,33 @@ async function installDashboardApiFixtures(): Promise<void> {
             },
             attentionStatus: "healthy",
           },
+          ...Array.from({ length: 49 }, (_, index) => {
+            const sequence = index + 2;
+            const suffix = String(sequence).padStart(3, "0");
+            const attention = sequence % 5 === 0;
+            return {
+              id: `resource-${suffix}`,
+              name: `service-${suffix}`,
+              slug: `service-${suffix}`,
+              kind: sequence % 4 === 0 ? "worker" : "application",
+              health: {
+                status: attention ? "degraded" : "healthy",
+                observedAt: "2026-08-24T08:00:00.000Z",
+              },
+              access: attention
+                ? { status: "not-ready" }
+                : { status: "ready", url: `https://service-${suffix}.example.test` },
+              latestDeployment: {
+                id: `dep_${suffix}`,
+                status: attention ? "failed" : "succeeded",
+                createdAt: "2026-08-24T08:00:00.000Z",
+              },
+              attentionStatus: attention ? "attention" : "healthy",
+            };
+          }),
         ],
-        attention: { total: 1, healthy: 1, attention: 0, unknown: 0 },
+        attention: { total: 100, healthy: 80, attention: 20, unknown: 0 },
+        nextCursor: "resource-cursor-50",
         generatedAt: "2026-08-24T08:00:00.000Z",
       },
     ],
@@ -171,6 +221,211 @@ async function installDashboardApiFixtures(): Promise<void> {
           },
         ],
         generatedAt: "2026-08-24T08:00:00.000Z",
+      },
+    ],
+    [
+      "fixtures/resource-detail.json",
+      {
+        schemaVersion: "resources.show/v1",
+        resource: {
+          id: "api-gateway",
+          projectId: "atlas-api",
+          environmentId: "production",
+          name: "api-gateway",
+          slug: "api-gateway",
+          kind: "application",
+          createdAt: "2026-08-20T08:00:00.000Z",
+          services: [],
+          deploymentCount: 2,
+          lastDeploymentId: "dep_atlas",
+          lastDeploymentStatus: "succeeded",
+        },
+        source: {
+          kind: "remote-git",
+          locator: "https://github.com/appaloft/api-gateway.git",
+          displayName: "appaloft/api-gateway",
+          sourceBindingFingerprint: "source_fixture",
+          gitRef: "main",
+        },
+        runtimeProfile: {
+          strategy: "workspace-commands",
+          installCommand: "bun install --frozen-lockfile",
+          buildCommand: "bun run build",
+          startCommand: "bun run start",
+          replicas: 1,
+        },
+        networkProfile: {
+          internalPort: 3000,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+        },
+        accessProfile: { generatedAccessMode: "inherit", pathPrefix: "/" },
+        accessSummary: {
+          plannedGeneratedAccessRoute: {
+            url: "https://api.example.test",
+            hostname: "api.example.test",
+            scheme: "https",
+            pathPrefix: "/",
+            proxyKind: "caddy",
+            targetPort: 3000,
+          },
+        },
+        lifecycle: { status: "active" },
+        diagnostics: [],
+        generatedAt: "2026-08-24T08:00:00.000Z",
+      },
+    ],
+    [
+      "fixtures/resource-logs.json",
+      {
+        mode: "bounded",
+        resourceId: "api-gateway",
+        deploymentId: "dep_atlas",
+        logs: [
+          {
+            resourceId: "api-gateway",
+            deploymentId: "dep_atlas",
+            stream: "stdout",
+            timestamp: "2026-08-24T08:00:00.000Z",
+            sequence: 1,
+            message: "server ready on :3000",
+            masked: true,
+          },
+        ],
+      },
+    ],
+    [
+      "fixtures/resource-rollup.json",
+      {
+        schemaVersion: "runtime-monitoring.rollup/v1",
+        scope: { kind: "resource", resourceId: "api-gateway" },
+        from: "2026-08-24T02:00:00.000Z",
+        to: "2026-08-24T08:00:00.000Z",
+        bucket: "five-minute",
+        generatedAt: "2026-08-24T08:00:00.000Z",
+        freshness: "recent-sample",
+        partial: false,
+        retention: { rawRetentionHours: 24 },
+        series: [],
+        totals: {
+          cpu: { containerCpuPercent: 12.4 },
+          memory: { containerUsedBytes: 134217728 },
+        },
+        topContributors: [],
+        deploymentMarkers: [],
+        warnings: [],
+        sourceErrors: [],
+      },
+    ],
+    [
+      "fixtures/resource-delete-check.json",
+      {
+        schemaVersion: "resources.delete-check/v1",
+        resourceId: "api-gateway",
+        lifecycleStatus: "active",
+        eligible: true,
+        blockers: [],
+        checkedAt: "2026-08-24T08:00:00.000Z",
+      },
+    ],
+    [
+      "fixtures/resource-deployments.json",
+      {
+        items: [
+          {
+            id: "dep_atlas",
+            projectId: "atlas-api",
+            environmentId: "production",
+            resourceId: "api-gateway",
+            serverId: "server-production",
+            destinationId: "api-gateway",
+            target: {
+              kind: "server-backed",
+              serverId: "server-production",
+              destinationId: "api-gateway",
+            },
+            status: "succeeded",
+            triggerKind: "force-redeploy",
+            sourceCommitSha: "481e9c05b4f9a2d1",
+            runtimePlan: {
+              id: "plan_atlas",
+              source: {
+                kind: "git-public",
+                locator: "https://github.com/appaloft/api-gateway.git",
+                displayName: "appaloft/api-gateway",
+              },
+              buildStrategy: "workspace-commands",
+              packagingMode: "host-process-runtime",
+              execution: { kind: "host-process", port: 3000 },
+              target: {
+                kind: "single-server",
+                providerKey: "local-shell",
+                serverIds: ["server-production"],
+              },
+              detectSummary: "detected Bun workspace",
+              generatedAt: "2026-08-24T07:59:00.000Z",
+              steps: ["detect", "build", "deploy", "verify"],
+            },
+            environmentSnapshot: {
+              id: "snapshot_atlas",
+              environmentId: "production",
+              createdAt: "2026-08-24T07:59:00.000Z",
+              precedence: ["resource", "environment"],
+              variables: [],
+            },
+            timeline: [],
+            timelineCount: 0,
+            createdAt: "2026-08-24T08:00:00.000Z",
+            startedAt: "2026-08-24T08:00:10.000Z",
+            finishedAt: "2026-08-24T08:01:00.000Z",
+          },
+          {
+            id: "dep_atlas_previous",
+            projectId: "atlas-api",
+            environmentId: "production",
+            resourceId: "api-gateway",
+            serverId: "server-production",
+            destinationId: "api-gateway",
+            target: {
+              kind: "server-backed",
+              serverId: "server-production",
+              destinationId: "api-gateway",
+            },
+            status: "failed",
+            triggerKind: "create",
+            runtimePlan: {
+              id: "plan_atlas_previous",
+              source: {
+                kind: "git-public",
+                locator: "https://github.com/appaloft/api-gateway.git",
+                displayName: "appaloft/api-gateway",
+              },
+              buildStrategy: "workspace-commands",
+              packagingMode: "host-process-runtime",
+              execution: { kind: "host-process", port: 3000 },
+              target: {
+                kind: "single-server",
+                providerKey: "local-shell",
+                serverIds: ["server-production"],
+              },
+              detectSummary: "detected Bun workspace",
+              generatedAt: "2026-08-23T07:59:00.000Z",
+              steps: ["detect", "build", "deploy", "verify"],
+            },
+            environmentSnapshot: {
+              id: "snapshot_atlas_previous",
+              environmentId: "production",
+              createdAt: "2026-08-23T07:59:00.000Z",
+              precedence: ["resource", "environment"],
+              variables: [],
+            },
+            timeline: [],
+            timelineCount: 0,
+            createdAt: "2026-08-23T08:00:00.000Z",
+            startedAt: "2026-08-23T08:00:10.000Z",
+            finishedAt: "2026-08-23T08:01:00.000Z",
+          },
+        ],
       },
     ],
   ]);
@@ -250,6 +505,33 @@ async function capture(view: Bun.WebView, name: string): Promise<string> {
   return output;
 }
 
+async function clickResourceDestination(
+  view: Bun.WebView,
+  hrefFragment: string,
+  destinationSelector: string,
+): Promise<number> {
+  return view.evaluate<number>(`new Promise((resolve, reject) => {
+    const startedAt = performance.now();
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector('${destinationSelector}')) return;
+      observer.disconnect();
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now() - startedAt)));
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const link = document.querySelector('nav[aria-label="Resource"] a[href*="${hrefFragment}"]');
+    if (!(link instanceof HTMLAnchorElement)) {
+      observer.disconnect();
+      reject(new Error('Resource destination link was not found'));
+      return;
+    }
+    link.click();
+    setTimeout(() => {
+      observer.disconnect();
+      reject(new Error('Resource destination did not render'));
+    }, 2000);
+  })`);
+}
+
 beforeAll(async () => {
   await installDashboardApiFixtures();
   const buildRoot = new URL("../../build/", import.meta.url).pathname;
@@ -259,11 +541,12 @@ beforeAll(async () => {
       if (command instanceof CreateProjectCommand) {
         return ok({ id: "created-project" } as T);
       }
-      return ok({} as T);
+      return ok({ id: "api-gateway" } as T);
     },
   } as CommandBus;
   const queryBus = {
     execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+      apiFixtureQueries.push(query.constructor.name);
       const fixturePath =
         query instanceof ListProjectSummariesQuery
           ? "api/projects/summaries"
@@ -271,7 +554,17 @@ beforeAll(async () => {
             ? "api/projects/atlas-api/environments/production/overview"
             : query instanceof ResourceOverviewQuery
               ? "api/projects/atlas-api/environments/production/resources/api-gateway/overview"
-              : undefined;
+              : query instanceof ShowResourceQuery
+                ? "fixtures/resource-detail.json"
+                : query instanceof ResourceRuntimeLogsQuery
+                  ? "fixtures/resource-logs.json"
+                  : query instanceof RuntimeMonitoringRollupQuery
+                    ? "fixtures/resource-rollup.json"
+                    : query instanceof CheckResourceDeleteSafetyQuery
+                      ? "fixtures/resource-delete-check.json"
+                      : query instanceof ListDeploymentsQuery
+                        ? "fixtures/resource-deployments.json"
+                        : undefined;
       if (!fixturePath) throw new Error(`Unexpected Dashboard query: ${query.constructor.name}`);
       return ok((await Bun.file(`${buildRoot}${fixturePath}`).json()) as T);
     },
@@ -464,7 +757,7 @@ describe("Dashboard foundation WebView", () => {
     await view.navigate(`${previewUrl}/projects`);
     await waitFor(
       () => view.evaluate<number>(`document.querySelectorAll('[data-project-card]').length`),
-      (count) => count === 3,
+      (count) => count === 13,
     );
     expect(apiFixtureRequests.filter((path) => path.startsWith("/api/"))).toHaveLength(2);
     expect(
@@ -484,6 +777,10 @@ describe("Dashboard foundation WebView", () => {
       () => view.evaluate<string>(`document.body.textContent ?? ''`),
       (content) => content.includes("api-gateway"),
     );
+    expect(
+      await view.evaluate<number>(`document.querySelectorAll('a[href*="/resources/"]').length`),
+    ).toBeLessThanOrEqual(50);
+    expect(await view.evaluate<string>(`document.body.textContent ?? ''`)).toContain("service-050");
     expect(apiFixtureRequests.filter((path) => path.startsWith("/api/"))).toHaveLength(2);
     expect(
       apiFixtureRequests.filter((path) => path === "/api/rpc/projects/environmentOverview"),
@@ -506,6 +803,301 @@ describe("Dashboard foundation WebView", () => {
       apiFixtureRequests.some((path) => path.includes("logs") || path.includes("metrics")),
     ).toBe(false);
   });
+
+  test("[DASH-PERF-001][DASH-PERF-002][DASH-PERF-003] records bounded route performance evidence", async () => {
+    const scenarios = [
+      {
+        key: "projects",
+        path: "/projects",
+        ready: (view: Bun.WebView) =>
+          waitFor(
+            () => view.evaluate<number>(`document.querySelectorAll('[data-project-card]').length`),
+            (count) => count === 13,
+          ),
+      },
+      {
+        key: "project-overview",
+        path: "/projects/atlas-api/overview?environment=production&view=list",
+        ready: (view: Bun.WebView) =>
+          waitFor(
+            () => view.evaluate<string>(`document.body.textContent ?? ''`),
+            (content) => content.includes("service-050"),
+          ),
+      },
+      {
+        key: "resource-overview",
+        path: "/projects/atlas-api/resources/api-gateway/overview?environment=production&view=list",
+        ready: (view: Bun.WebView) =>
+          waitFor(
+            () => view.evaluate<string>(`document.body.textContent ?? ''`),
+            (content) => content.includes("dep_atlas"),
+          ),
+      },
+    ] as const;
+    const evidence: Record<
+      string,
+      {
+        samplesMs: number[];
+        p95Ms: number;
+        productDataRequestPaths: string[];
+        requestCount: number;
+      }
+    > = {};
+
+    await using view = createView(1_440, 1_000);
+    for (const scenario of scenarios) {
+      const samplesMs: number[] = [];
+      let productDataRequestPaths: string[] = [];
+      for (let index = 0; index < 20; index += 1) {
+        apiFixtureRequests.length = 0;
+        const startedAt = performance.now();
+        await view.navigate(`${previewUrl}${scenario.path}`);
+        await scenario.ready(view);
+        samplesMs.push(Number((performance.now() - startedAt).toFixed(2)));
+        await Bun.sleep(100);
+        productDataRequestPaths = [
+          ...new Set(apiFixtureRequests.filter((pathname) => pathname.startsWith("/api/rpc/"))),
+        ].toSorted();
+      }
+      const sorted = samplesMs.toSorted((left, right) => left - right);
+      evidence[scenario.key] = {
+        samplesMs,
+        p95Ms: sorted[Math.ceil(sorted.length * 0.95) - 1] ?? Number.POSITIVE_INFINITY,
+        productDataRequestPaths,
+        requestCount: productDataRequestPaths.length,
+      };
+    }
+
+    await mkdir(evidenceDirectory, { recursive: true });
+    await Bun.write(
+      `${evidenceDirectory}/dashboard-route-performance.json`,
+      JSON.stringify(
+        {
+          schemaVersion: "appaloft.dashboard-route-performance/v1",
+          capturedAt: new Date().toISOString(),
+          viewport: "1440x1000",
+          sampleCountPerRoute: 20,
+          scenarios: evidence,
+        },
+        undefined,
+        2,
+      ),
+    );
+
+    expect(evidence.projects?.requestCount).toBeLessThanOrEqual(4);
+    expect(evidence.projects?.p95Ms).toBeLessThanOrEqual(1_500);
+    expect(evidence["project-overview"]?.requestCount).toBeLessThanOrEqual(5);
+    expect(evidence["project-overview"]?.p95Ms).toBeLessThanOrEqual(1_800);
+    expect(evidence["resource-overview"]?.requestCount).toBeLessThanOrEqual(2);
+    expect(evidence["resource-overview"]?.p95Ms).toBeLessThanOrEqual(1_000);
+  }, 20_000);
+
+  test("[DASH-DATA-007][DASH-PERF-003][DASH-PERF-004][DASH-PERF-006] loads only the active Resource destination", async () => {
+    await using view = createView(1_440, 1_000);
+
+    apiFixtureRequests.length = 0;
+    await navigateWithTheme(
+      view,
+      "/projects/atlas-api/resources/api-gateway/configuration?environment=production&view=list",
+      "light",
+    );
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(`Boolean(document.querySelector('[data-resource-configuration]'))`),
+      Boolean,
+    );
+    expect(apiFixtureRequests).toContain("/api/rpc/resources/show");
+    expect(apiFixtureRequests).not.toContain("/api/rpc/resources/overview");
+    expect(
+      apiFixtureRequests.some(
+        (path) => path.includes("runtime-logs") || path.includes("runtimeMonitoring"),
+      ),
+    ).toBe(false);
+
+    apiFixtureRequests.length = 0;
+    apiFixtureQueries.length = 0;
+    await view.navigate(
+      `${previewUrl}/projects/atlas-api/resources/api-gateway/logs-metrics?environment=production&view=list`,
+    );
+    await waitFor(
+      async () => apiFixtureQueries.length,
+      (count) => count >= 3,
+    );
+    expect(apiFixtureQueries).toHaveLength(3);
+    expect(apiFixtureQueries).toEqual(
+      expect.arrayContaining([
+        "ProjectEnvironmentOverviewQuery",
+        "ResourceRuntimeLogsQuery",
+        "RuntimeMonitoringRollupQuery",
+      ]),
+    );
+    await waitFor(
+      () => view.evaluate<string>(`document.body.textContent ?? ''`),
+      (content) => content.includes("server ready on :3000"),
+    );
+    expect(apiFixtureRequests).toContain("/api/rpc/resources/logs");
+    expect(apiFixtureRequests).toContain("/api/rpc/runtimeMonitoring/rollup");
+    expect(apiFixtureRequests).not.toContain("/api/rpc/resources/show");
+    expect(apiFixtureRequests).not.toContain("/api/rpc/resources/deleteCheck");
+
+    apiFixtureRequests.length = 0;
+    await view.navigate(
+      `${previewUrl}/projects/atlas-api/resources/api-gateway/networking?environment=production&view=list`,
+    );
+    await waitFor(
+      () => view.evaluate<boolean>(`Boolean(document.querySelector('[data-resource-networking]'))`),
+      Boolean,
+    );
+    expect(apiFixtureRequests).toContain("/api/rpc/resources/show");
+    expect(apiFixtureRequests).not.toContain("/api/rpc/resources/overview");
+    expect(apiFixtureRequests.some((path) => path.includes("runtime-logs"))).toBe(false);
+
+    apiFixtureRequests.length = 0;
+    await view.navigate(
+      `${previewUrl}/projects/atlas-api/resources/api-gateway/settings?environment=production&view=list`,
+    );
+    await waitFor(
+      () => view.evaluate<boolean>(`Boolean(document.querySelector('[data-resource-settings]'))`),
+      Boolean,
+    );
+    expect(apiFixtureRequests).toContain("/api/rpc/resources/show");
+    expect(apiFixtureRequests).toContain("/api/rpc/resources/deleteCheck");
+    expect(apiFixtureRequests).not.toContain("/api/rpc/resources/overview");
+    expect(apiFixtureRequests.some((path) => path.includes("runtimeMonitoring"))).toBe(false);
+
+    apiFixtureRequests.length = 0;
+    apiFixtureQueries.length = 0;
+    await view.navigate(
+      `${previewUrl}/projects/atlas-api/resources/api-gateway/deployments?environment=production&view=list`,
+    );
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(`Boolean(document.querySelector('[data-resource-deployments]'))`),
+      Boolean,
+    );
+    expect(apiFixtureQueries).toEqual(
+      expect.arrayContaining(["ProjectEnvironmentOverviewQuery", "ListDeploymentsQuery"]),
+    );
+    expect(apiFixtureRequests).toContain("/api/rpc/deployments/list");
+    expect(apiFixtureRequests).not.toContain("/api/rpc/resources/overview");
+    expect(
+      await view.evaluate<string>(
+        `document.querySelector('[data-resource-deployments]')?.textContent ?? ''`,
+      ),
+    ).toContain("dep_atlas_previous");
+  }, 15_000);
+
+  test("[DASH-OWN-009] dispatches accepted Resource configuration and lifecycle commands", async () => {
+    await using view = createView(1_440, 1_000);
+
+    await navigateWithTheme(
+      view,
+      "/projects/atlas-api/resources/api-gateway/configuration?environment=production&view=list",
+      "light",
+    );
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(`Boolean(document.querySelector('[data-resource-configuration]'))`),
+      Boolean,
+    );
+    apiFixtureCommands.length = 0;
+    await view.evaluate(`document.querySelector('[data-resource-configuration]')?.requestSubmit()`);
+    await waitFor(
+      async () => apiFixtureCommands.includes("ConfigureResourceRuntimeCommand"),
+      Boolean,
+    );
+    expect(apiFixtureCommands).toEqual(["ConfigureResourceRuntimeCommand"]);
+
+    await view.navigate(
+      `${previewUrl}/projects/atlas-api/resources/api-gateway/networking?environment=production&view=list`,
+    );
+    await waitFor(
+      () => view.evaluate<boolean>(`Boolean(document.querySelector('[data-resource-networking]'))`),
+      Boolean,
+    );
+    apiFixtureCommands.length = 0;
+    await view.evaluate(`document.querySelector('[data-resource-networking]')?.requestSubmit()`);
+    await waitFor(
+      async () => apiFixtureCommands.length,
+      (count) => count === 2,
+    );
+    expect(apiFixtureCommands).toEqual([
+      "ConfigureResourceNetworkCommand",
+      "ConfigureResourceAccessCommand",
+    ]);
+
+    await view.navigate(
+      `${previewUrl}/projects/atlas-api/resources/api-gateway/settings?environment=production&view=list`,
+    );
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(
+          `Boolean(document.querySelector('[data-resource-lifecycle-action]'))`,
+        ),
+      Boolean,
+    );
+    apiFixtureCommands.length = 0;
+    await view.evaluate(`document.querySelector('[data-resource-lifecycle-action]')?.click()`);
+    await waitFor(async () => apiFixtureCommands.includes("ArchiveResourceCommand"), Boolean);
+    expect(apiFixtureCommands).toEqual(["ArchiveResourceCommand"]);
+  }, 15_000);
+
+  test("[DASH-DATA-007][DASH-PERF-004] keeps cached tab switches fast and leaves no inactive requests", async () => {
+    await using view = createView(1_440, 1_000);
+    await navigateWithTheme(
+      view,
+      "/projects/atlas-api/resources/api-gateway/configuration?environment=production&view=list",
+      "light",
+    );
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(`Boolean(document.querySelector('[data-resource-configuration]'))`),
+      Boolean,
+    );
+
+    await clickResourceDestination(view, "/networking", "[data-resource-networking]");
+    await clickResourceDestination(view, "/configuration", "[data-resource-configuration]");
+
+    const samples: number[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      samples.push(
+        await clickResourceDestination(view, "/networking", "[data-resource-networking]"),
+      );
+      samples.push(
+        await clickResourceDestination(view, "/configuration", "[data-resource-configuration]"),
+      );
+    }
+    const sortedSamples = samples.toSorted((left, right) => left - right);
+    const p95 =
+      sortedSamples[Math.ceil(sortedSamples.length * 0.95) - 1] ?? Number.POSITIVE_INFINITY;
+    await mkdir(evidenceDirectory, { recursive: true });
+    await Bun.write(
+      `${evidenceDirectory}/resource-tab-performance.json`,
+      JSON.stringify(
+        {
+          schemaVersion: "appaloft.dashboard-resource-tab-performance/v1",
+          capturedAt: new Date().toISOString(),
+          viewport: "1440x1000",
+          sampleCount: samples.length,
+          samplesMs: samples.map((sample) => Number(sample.toFixed(2))),
+          p95Ms: Number(p95.toFixed(2)),
+          blockingBudgetMs: 200,
+        },
+        undefined,
+        2,
+      ),
+    );
+    expect(p95).toBeLessThanOrEqual(200);
+
+    await clickResourceDestination(view, "/logs-metrics", "[data-resource-observability]");
+    const inactiveRequestCount = apiFixtureRequests.length;
+    await clickResourceDestination(view, "/configuration", "[data-resource-configuration]");
+    const settledRequestCount = apiFixtureRequests.length;
+    expect(settledRequestCount).toBeGreaterThan(inactiveRequestCount);
+    await Bun.sleep(500);
+    expect(apiFixtureRequests).toHaveLength(settledRequestCount);
+    expect(apiFixtureRequests.some((path) => path.includes("logsStream"))).toBe(false);
+  }, 20_000);
 
   test("[DASH-VIS-003][DASH-A11Y-007] captures labeled desktop Light and Dark fixtures", async () => {
     await using view = createView(1_440, 1_000);
@@ -556,6 +1148,26 @@ describe("Dashboard foundation WebView", () => {
       (await Bun.file(await capture(view, "resource-desktop-dark")).arrayBuffer()).byteLength,
     ).toBeGreaterThan(10_000);
 
+    for (const fixture of [
+      {
+        destination: "configuration",
+        theme: "light",
+        name: "resource-configuration-desktop-light",
+      },
+      { destination: "logs-metrics", theme: "dark", name: "resource-observability-desktop-dark" },
+      { destination: "networking", theme: "light", name: "resource-networking-desktop-light" },
+      { destination: "settings", theme: "dark", name: "resource-settings-desktop-dark" },
+    ] as const) {
+      await navigateWithTheme(
+        view,
+        `/projects/atlas-api/resources/api-gateway/${fixture.destination}?environment=production&view=list`,
+        fixture.theme,
+      );
+      expect(
+        (await Bun.file(await capture(view, fixture.name)).arrayBuffer()).byteLength,
+      ).toBeGreaterThan(10_000);
+    }
+
     await navigateWithTheme(view, "/patterns", "dark");
     expect(await view.evaluate<string | undefined>(`document.documentElement.dataset.theme`)).toBe(
       "dark",
@@ -563,7 +1175,7 @@ describe("Dashboard foundation WebView", () => {
     expect(
       (await Bun.file(await capture(view, "patterns-desktop-dark")).arrayBuffer()).byteLength,
     ).toBeGreaterThan(10_000);
-  });
+  }, 15_000);
 
   test("[DASH-VIS-004][DASH-A11Y-006][DASH-A11Y-008] keeps mobile navigation labeled and Resource content on-canvas", async () => {
     await using view = createView(390, 844);
@@ -624,7 +1236,42 @@ describe("Dashboard foundation WebView", () => {
     expect(
       (await Bun.file(await capture(view, "resource-mobile-dark")).arrayBuffer()).byteLength,
     ).toBeGreaterThan(10_000);
-  });
+
+    for (const fixture of [
+      { destination: "configuration", selector: "[data-resource-configuration]" },
+      { destination: "logs-metrics", selector: "[data-resource-observability]" },
+      { destination: "networking", selector: "[data-resource-networking]" },
+      { destination: "settings", selector: "[data-resource-settings]" },
+    ] as const) {
+      await navigateWithTheme(
+        view,
+        `/projects/atlas-api/resources/api-gateway/${fixture.destination}?environment=production&view=list`,
+        "dark",
+      );
+      await waitFor(
+        () => view.evaluate<string>(`document.body.textContent ?? ''`),
+        (content) => content.includes("api-gateway"),
+      );
+      const dimensions = await view.evaluate<{
+        clientWidth: number;
+        destinationVisible: boolean;
+        panelWidth: number;
+        scrollWidth: number;
+      }>(`({
+        clientWidth: document.documentElement.clientWidth,
+        destinationVisible: Boolean(document.querySelector('${fixture.selector}')),
+        panelWidth: document.querySelector('[data-resource-panel-resize]')?.closest('aside')?.getBoundingClientRect().width ?? 0,
+        scrollWidth: document.documentElement.scrollWidth,
+      })`);
+      expect(dimensions.destinationVisible).toBe(true);
+      expect(dimensions.panelWidth).toBe(dimensions.clientWidth);
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+    }
+    expect(
+      (await Bun.file(await capture(view, "resource-settings-mobile-dark")).arrayBuffer())
+        .byteLength,
+    ).toBeGreaterThan(10_000);
+  }, 30_000);
 
   test("[DASH-A11Y-005][DASH-A11Y-006] exposes a bounded keyboard-operable desktop panel resize control", async () => {
     await using view = createView(1_440, 1_000);

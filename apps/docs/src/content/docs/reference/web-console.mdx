@@ -38,6 +38,8 @@ Projects → Project/Environment → Resource 的 Beta 闭环使用三个有界�
 
 这些返回值是只读 observation。部署、配置、网络和运行时操作仍调用既有 Resource/Deployment command，不由 Svelte 页面自行解释或放宽。Resource 的日志、指标和其它 destination 数据只在对应页面激活后加载；关闭面板或切换 destination 后，不再保留非活动订阅。
 
+Resource 界面包含六个 owner-scoped destination：**概览、部署、配置、日志与指标、网络、设置**。概览保持紧凑；部署通过 `deployments.list` 读取有界历史；配置编辑持久化 runtime profile；日志与指标读取脱敏的有界日志和留存监控汇总；网络编辑 Resource network 与 generated-access profile；设置调用服务端生命周期与删除安全检查。各 destination 的代码和数据都按需加载，打开一个页面不会同时挂载其它页面。
+
 扩展继续使用 `appaloft.console.extension-page/v1` 文档。新增的 scoped navigation metadata 只把扩展放入声明的 Workspace、Project 或 Resource destination；缺少或无法识别该 metadata 的旧扩展不会被提升为新的 Workspace 常驻菜单。
 
 ## 问号帮助

@@ -149,7 +149,14 @@
     route.projectId;
     route.environmentId;
     route.resourceId;
-    void load();
+    if (route.destination === "overview") {
+      void load();
+    } else {
+      latestRequest += 1;
+      overview = undefined;
+      loading = false;
+      error = false;
+    }
   });
 
   const labels: Record<ResourceDestination, string> = {
@@ -232,11 +239,11 @@
     </header>
 
     <div class="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
-      {#if (route.destination === "overview" || route.destination === "deployments") && loading}
+      {#if route.destination === "overview" && loading}
         <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface" aria-label="Loading resource">
           <LoaderCircle class="size-6 animate-spin text-primary" />
         </div>
-      {:else if (route.destination === "overview" || route.destination === "deployments") && (error || !overview)}
+      {:else if route.destination === "overview" && (error || !overview)}
         <section class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-8 text-center">
           <TriangleAlert class="mx-auto size-6 text-destructive" />
           <h3 class="mt-4 font-semibold">{i18n.t(copy.projects.loadError)}</h3>
@@ -334,57 +341,71 @@
             </span>
           </div>
         </section>
-      {:else if route.destination === "deployments" && overview}
-        <section class="overflow-hidden rounded-[14px] border border-divider bg-surface">
-          <div class="border-b border-divider p-5">
-            <h3 class="font-semibold">{i18n.t(copy.resource.deploymentHistory)}</h3>
-            <p class="mt-1 text-sm text-muted-foreground">
-              {i18n.t(copy.resource.deploymentHistoryDescription)}
-            </p>
+      {:else if route.destination === "deployments"}
+        {#await import("./ResourceDeployments.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
           </div>
-          {#if overview.latestDeployments.length === 0}
-            <div class="grid min-h-48 place-items-center px-5 text-center">
-              <div>
-                <GitCommitHorizontal class="mx-auto size-6 text-muted-foreground" />
-                <p class="mt-3 text-sm font-medium">{i18n.t(copy.resource.noDeployments)}</p>
-              </div>
-            </div>
-          {:else}
-            <div class="divide-y divide-divider">
-              {#each overview.latestDeployments as deployment, index (deployment.id)}
-                <article class="flex items-center gap-3 p-4 sm:p-5">
-                  <span
-                    class={`grid size-9 shrink-0 place-items-center rounded-[10px] ${deployment.status === "succeeded" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : deployment.status === "failed" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}
-                  >
-                    {#if deployment.status === "succeeded"}
-                      <CheckCircle2 class="size-[18px]" />
-                    {:else if deployment.status === "failed"}
-                      <TriangleAlert class="size-[18px]" />
-                    {:else}
-                      <LoaderCircle class="size-[18px]" />
-                    {/if}
-                  </span>
-                  <div class="min-w-0 flex-1">
-                    <div class="flex min-w-0 items-center gap-2">
-                      <code class="truncate text-sm font-medium">{deployment.id}</code>
-                      {#if index === 0}
-                        <Badge variant="secondary" class="shrink-0 rounded-full text-[10px]">
-                          {i18n.t(copy.resource.activeDeployment)}
-                        </Badge>
-                      {/if}
-                    </div>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      {activityLabel(deployment.finishedAt || deployment.createdAt)}
-                    </p>
-                  </div>
-                  <span class="shrink-0 text-xs font-medium capitalize text-muted-foreground">
-                    {deployment.status.replaceAll("-", " ")}
-                  </span>
-                </article>
-              {/each}
-            </div>
-          {/if}
-        </section>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
+      {:else if route.destination === "configuration"}
+        {#await import("./ResourceConfiguration.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+          </div>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
+      {:else if route.destination === "logs-metrics"}
+        {#await import("./ResourceObservability.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+          </div>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
+      {:else if route.destination === "networking"}
+        {#await import("./ResourceNetworking.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+          </div>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
+      {:else if route.destination === "settings"}
+        {#await import("./ResourceSettings.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+          </div>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
       {:else}
         <section class="min-h-64 rounded-[14px] border border-divider bg-surface p-5">
           <span class="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">

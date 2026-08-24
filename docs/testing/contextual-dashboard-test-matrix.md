@@ -79,6 +79,21 @@ rules. Legacy route parity is deliberately absent.
 | DASH-PERF-007 | build                     | active shell+route JavaScript <=300 KiB gzip; charts/editors/terminal are lazy.         |
 | DASH-PERF-008 | Topology 10/50/100        | p75 INP <=200ms and >=55 FPS over 2s pan/drag; otherwise feature stays disabled.        |
 
+### Recorded beta-loop evidence (2026-08-24)
+
+- Same-machine Bun.WebView production-build comparison, 20 samples per route: Projects p95
+  `292.56ms -> 125.65ms`, Project Overview `315.31ms -> 129.41ms`, and Resource Overview
+  `311.05ms -> 128.09ms`; every measured p95 reduction exceeds 30%.
+- Product-data request paths fell from `7 -> 1`, `12 -> 1`, and `20 -> 2` respectively. The
+  Dashboard Project fixture represents 100 seeded Resources and mounts the first bounded 50 rows.
+- Cached Resource destination switch p95 is `52ms`; leaving Logs & Metrics leaves zero inactive
+  streams or follow-up requests.
+- The largest shell-plus-active-destination static import closure is `278459` gzip bytes. All lazy
+  destination chunks together are `295305` gzip bytes and are not loaded as one active route.
+- Machine, bundle, fixture, route, and artifact details live in
+  `apps/dashboard/test/evidence/foundation-2026-08-24.json`; the two WebView suites reproduce the
+  raw route measurements under `/private/tmp/appaloft-dashboard-evidence`.
+
 ## Rollout Gates
 
 | Test ID           | Gate        | Required evidence                                                                                                                                      |

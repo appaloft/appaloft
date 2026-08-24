@@ -23,7 +23,7 @@
 ## Foundation
 
 - [x] Record the same-toolchain legacy bundle baseline and deterministic 1/10/50/100 fixtures.
-- [ ] Record comparable legacy/Dashboard product-data request and timing baselines once #1424 adds
+- [x] Record comparable legacy/Dashboard product-data request and timing baselines once #1424 adds
       the first real summary-query loop; #1423 does not present its static preview as zero-request
       control-plane evidence.
 - [x] Add `apps/dashboard` workspace, static build, local command, and selectable bundle seam.
@@ -47,7 +47,7 @@
 - [x] Projects Workspace list and creation/open path.
 - [x] Project Overview/List, Environment URL context, and Resource selection.
 - [x] Resource Overview/Deployments route-backed panel/full page.
-- [ ] Resource Configuration, Logs & Metrics, Networking, and Settings.
+- [x] Resource Configuration, Logs & Metrics, Networking, and Settings.
 - [ ] Infrastructure and Activity.
 - [ ] Marketplace and Settings.
 - [ ] Project Deployments, Observability, and Settings.

@@ -29,6 +29,8 @@ The Projects → Project/Environment → Resource beta loop uses three bounded q
 
 These responses are read-only observations. Deployment, configuration, networking, and runtime actions still dispatch the existing Resource/Deployment commands; Svelte pages do not reinterpret or weaken their rules. Resource logs, metrics, and other destination data load only when that destination is active, and inactive subscriptions are disposed when the panel closes or the destination changes.
 
+The Resource surface has six owner-scoped destinations: **Overview, Deployments, Configuration, Logs & Metrics, Networking, and Settings**. Overview stays compact; Deployments reads a bounded history through `deployments.list`; Configuration edits the durable runtime profile; Logs & Metrics reads masked bounded logs and retained monitoring rollups; Networking edits the Resource network and generated-access profiles; Settings uses server-side lifecycle and delete-safety operations. Destination code and data are loaded on demand, so opening one destination does not mount the others.
+
 Extensions continue to use `appaloft.console.extension-page/v1` documents. Additive scoped-navigation metadata places a contribution only inside its declared Workspace, Project, or Resource destination. A legacy extension with missing or unknown scoped metadata is never promoted to a new permanent Workspace item.
 
 ## Question-mark help
