@@ -3,8 +3,8 @@
 ## Status
 
 - Round: Code
-- State: confirmed by owner on 2026-08-24; foundation merged and luminous visual refinement tracked
-  by issue #1430
+- State: confirmed by owner on 2026-08-24; foundation and luminous visual refinement merged through
+  PR #1431
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: [ADR-126](../../decisions/ADR-126-contextual-dashboard-and-web-route-boundary.md)
 - Compatibility: `pre-1.0-policy`, intentionally breaking Web routes; no legacy fallback required

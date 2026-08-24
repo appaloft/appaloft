@@ -114,11 +114,14 @@ Workspace navigation. Exact TypeScript schemas and compatibility tests are Code 
 - `dashboard-v2`, consumed by `apps/dashboard` and promoted to the canonical console preset only
   after default cutover.
 
-Dashboard v2 is Calm Infra: near-white neutral light canvas, warm-charcoal dark canvas, soft surface
-steps, 10px controls, 14-16px cards, 16-18px panels, 40-44px rows, restrained overlay-only
-elevation, body text of at least 14px, and Appaloft blue as the sole primary accent. It must provide
-complete light/dark semantic tokens and reduced-motion behavior. It is a clean-room synthesis; it
-must not copy Kun source or assets.
+Dashboard v2 is Calm Infra: near-white luminous Light canvas, lifted warm-charcoal Dark canvas, soft
+surface steps, 10px controls, 14-16px cards, 16-18px panels, 40-44px rows, restrained overlay-only
+elevation, body text of at least 14px, and Appaloft blue as the sole primary action accent. Public
+blue/cyan/violet ambient-light roles may add non-semantic shell depth, and pastel icon-surface roles
+may distinguish repeated objects; neither role carries action or status meaning, and ordinary cards
+do not glow. The preset must provide complete light/dark semantic tokens and reduced-motion
+behavior. It is a clean-room synthesis; it must not copy Kun source, token values, gradient recipes,
+or assets.
 
 ## Rollout Boundary
 

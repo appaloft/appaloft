@@ -55,6 +55,8 @@
 
 ## Rollout And Docs
 
+- [x] Record luminous-surface refinement PR #1431 and public `main` SHA
+      `0dfe728286a5cedcf08c6d49d027f146f5574c9d` before the downstream hosted pin sync.
 - [ ] Existing-anchor Docs Round: update both `reference/web-console` locales and docs registry.
 - [ ] Add breaking-route release note; do not add redirect promises.
 - [ ] Enable opt-in beta only after DASH-BETA rows pass.
