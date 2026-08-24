@@ -27,6 +27,7 @@ export * from "./cli-resolved-source";
 export * from "./community-occupancy-opencode-template";
 export * from "./community-occupancy-codex";
 export * from "./community-occupancy-pi-template";
+export * from "./community-occupancy-omp";
 export * from "./community-occupancy-vendor-templates";
 export * from "./community-remote-default-network-policy";
 

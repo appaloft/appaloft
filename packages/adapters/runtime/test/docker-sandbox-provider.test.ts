@@ -374,6 +374,35 @@ describe("DockerSandboxProvider", () => {
     expect(runner.terminalWrites).toEqual([]);
   });
 
+  test("[WS-REMOTE-HARNESS-175] installs occupancy omp on the host before attach", async () => {
+    const runner = new CapturingRunner();
+    const fetched: string[] = [];
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      fetchImpl: (async (url: string) => {
+        fetched.push(String(url));
+        return {
+          ok: true,
+          status: 200,
+          arrayBuffer: async () => new TextEncoder().encode("omp-binary").buffer,
+        } as Response;
+      }) as typeof fetch,
+    });
+    await provider.provision(request);
+    await provider.openTerminal({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      cwd: ".",
+      initialRows: 24,
+      initialCols: 80,
+      process: { argv: ["omp"] },
+    });
+    expect(fetched[0]).toContain("oh-my-pi/releases/download/v18.0.3/omp-linux-x64");
+    expect(runner.calls.some((call) => call.argv[1] === "cp")).toBe(true);
+    expect(runner.terminalCalls[0]?.argv.at(-1)).toBe("/workspace/.local/bin/omp");
+  });
+
   test("[SBX-RUNTIME-002] provisions a constrained gVisor container without shell interpolation", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });

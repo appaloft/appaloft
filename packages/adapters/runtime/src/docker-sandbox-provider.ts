@@ -1,6 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
+import { mkdtemp, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
+  COMMUNITY_OCCUPANCY_OMP_BIN,
+  occupancyOmpAttachArgv,
+  occupancyOmpReleaseUrl,
   type SandboxExecResult,
   type SandboxFileDescriptor,
   type SandboxPortExposure,
@@ -210,6 +216,7 @@ type DockerSandboxProviderInput = {
   now?: () => string;
   sleep?: (delayMs: number) => Promise<void>;
   credentialBroker?: boolean;
+  fetchImpl?: typeof fetch;
   hostEgress?: boolean;
   portableRecovery?: {
     kind: "shared-filesystem";
@@ -360,6 +367,7 @@ export class DockerSandboxProvider implements SandboxProvider {
   private readonly runner: SandboxDockerCommandRunner;
   private readonly portPublisher: SandboxPortPublisher | undefined;
   private readonly egressPolicy: SandboxEgressPolicyAdapter | undefined;
+  private readonly fetchImpl: typeof fetch;
   private readonly now: () => string;
   private readonly sleep: (delayMs: number) => Promise<void>;
   private readonly runtimeName: "runc" | "runsc";
@@ -410,6 +418,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       networkPolicy: input.egressPolicy || input.hostEgress ? ["deny", "allowlist"] : ["deny"],
       credentialBroker: input.credentialBroker ?? false,
     };
+    this.fetchImpl = input.fetchImpl ?? fetch;
     this.runner = input.runner ?? new BunSandboxDockerCommandRunner();
     this.portPublisher = input.portPublisher;
     this.egressPolicy = input.egressPolicy;
@@ -749,7 +758,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     const cwd = request.cwd && request.cwd !== "."
       ? await this.confinedWorkspacePath(request, request.cwd, "existing")
       : "/workspace";
-    const processArgv = request.process?.argv;
+    let processArgv = request.process?.argv;
     if (
       processArgv &&
       (processArgv.length === 0 ||
@@ -757,6 +766,10 @@ export class DockerSandboxProvider implements SandboxProvider {
         processArgv.some((value) => !value || value.length > 8_192 || value.includes("\0")))
     ) {
       throw new Error("Sandbox terminal process argv is invalid");
+    }
+    if (occupancyOmpAttachArgv(processArgv)) {
+      await this.ensureOccupancyOmp(request.providerHandle);
+      processArgv = [COMMUNITY_OCCUPANCY_OMP_BIN, ...(processArgv?.slice(1) ?? [])];
     }
     const initialInput = request.process?.initialInput;
     if (initialInput && initialInput.byteLength > 64 * 1024) {
@@ -1802,6 +1815,38 @@ export class DockerSandboxProvider implements SandboxProvider {
     ]);
     if (!text(listed.stdout).trim()) return false;
     throw new Error(`Docker Sandbox inspect failed: ${inspected.stderr || text(inspected.stdout)}`);
+  }
+
+  private async ensureOccupancyOmp(container: string): Promise<void> {
+    const present = await this.docker(
+      [
+        "exec",
+        container,
+        "sh",
+        "-c",
+        `if [ -x ${COMMUNITY_OCCUPANCY_OMP_BIN} ]; then echo yes; else echo no; fi`,
+      ],
+      undefined,
+      true,
+    );
+    if (text(present.stdout).trim() === "yes") return;
+    const arch = text((await this.docker(["exec", container, "uname", "-m"])).stdout).trim();
+    const response = await this.fetchImpl(occupancyOmpReleaseUrl(arch), { redirect: "follow" });
+    if (!response.ok) {
+      throw new Error(`Occupancy omp download failed: HTTP ${String(response.status)}`);
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength === 0) throw new Error("Occupancy omp download is empty");
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-omp-"));
+    const archive = join(directory, "omp");
+    try {
+      await writeFile(archive, bytes);
+      await this.docker(["exec", container, "mkdir", "-p", "/workspace/.local/bin"]);
+      await this.docker(["cp", archive, `${container}:${COMMUNITY_OCCUPANCY_OMP_BIN}`]);
+      await this.docker(["exec", container, "chmod", "755", COMMUNITY_OCCUPANCY_OMP_BIN]);
+    } finally {
+      await unlink(archive).catch(() => undefined);
+    }
   }
 
   private async docker(
