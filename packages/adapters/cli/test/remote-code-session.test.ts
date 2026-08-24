@@ -22,6 +22,7 @@ import {
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
   openWorkspaceWithOccupyDiskGatewayRetry,
+  workspaceOpenInputForOlderCloud,
   pinRemoteCodeDoorServer,
   REMOTE_CODE_DOOR_HINT,
   REMOTE_CODE_GITHUB_HINT,
@@ -117,6 +118,32 @@ describe("remote code door", () => {
     };
     expect(occupancyCloudCompatError(bound, server)).toEqual(bound);
   });
+  test("[WS-REMOTE-COMPAT-227] older Cloud open input drops targetServerId and projectId", () => {
+    expect(
+      workspaceOpenInputForOlderCloud({
+        repository: "https://github.com/appaloft/appaloft-cloud.git",
+        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        targetServerId: "srv_4lifk0yrcecy",
+        projectId: "prj_q4u7z18iumez",
+        attach: false,
+        forceNew: false,
+        profile: "appaloft-remote-codex",
+      }),
+    ).toEqual({
+      repository: "https://github.com/appaloft/appaloft-cloud.git",
+      repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+      ref: "refs/heads/main",
+      branch: "main",
+      commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      attach: false,
+      forceNew: false,
+      profile: "appaloft-remote-codex",
+    });
+  });
+
   test("[WS-REMOTE-COMPAT-220][WS-REMOTE-OPEN-BYOS-181] folder.local unstructured validation is a human next step, not Server targeting", () => {
     const server = { id: "srv_4lifk0yrcecy", name: "hostinger" };
     const cloud = {

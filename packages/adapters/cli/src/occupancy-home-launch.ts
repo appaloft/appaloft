@@ -15,6 +15,8 @@ import {
   saveOccupancyAgentPreference,
 } from "./occupancy-vendor.js";
 import {
+  isFolderLocalDoor,
+  isUnstructuredCloudValidation,
   occupancyCloudCompatError,
   occupyLiveSessionMissingError,
   pinRemoteCodeDoorServer,
@@ -22,6 +24,7 @@ import {
   type RemoteCodeOccupancy,
   type RemoteCodeServerSummary,
   resolveDefaultRemoteCodeDoor,
+  workspaceOpenInputForOlderCloud,
 } from "./remote-code-session.js";
 
 export const OCCUPANCY_HOME_VENDORS = ["grok", "codex", "claude", "opencode", "pi"] as const;
@@ -152,14 +155,14 @@ export async function occupyFromWorkspaceHome(input: {
     input.doorProbe?.explicitServerId,
   );
   const selectedProfile = harness === "opencode" ? undefined : occupancyRemoteProfileId(harness);
-  const command = OpenAgentWorkspaceCommand.create({
+  const openInput = {
     repository: door.repository,
     repositoryIdentity: door.repositoryIdentity,
     ref: door.ref,
     branch: door.branch,
     commitSha: door.commitSha,
     targetServerId: door.serverId,
-    attach: true,
+    attach: true as const,
     forceNew: input.forceNew === true,
     ...(selectedProfile ? { profile: selectedProfile } : {}),
     ...(input.projectId
@@ -167,12 +170,26 @@ export async function occupyFromWorkspaceHome(input: {
       : door.projectId && door.projectId !== "project"
         ? { projectId: door.projectId }
         : {}),
-  });
+  };
+  const command = OpenAgentWorkspaceCommand.create(openInput);
   if (command.isErr()) throw command.error;
   const opened = await input.executeCommand(command.value);
-  if (opened.isErr()) {
+  const result = await (async () => {
+    if (opened.isOk()) return opened;
+    if (
+      !isUnstructuredCloudValidation(opened.error as DomainError) ||
+      (!openInput.targetServerId && !openInput.projectId) ||
+      isFolderLocalDoor(door)
+    ) {
+      return opened;
+    }
+    const compat = OpenAgentWorkspaceCommand.create(workspaceOpenInputForOlderCloud(openInput));
+    if (compat.isErr()) throw compat.error;
+    return input.executeCommand(compat.value);
+  })();
+  if (result.isErr()) {
     throw occupancyCloudCompatError(
-      opened.error as DomainError,
+      result.error as DomainError,
       { id: door.serverId, name: door.serverName },
       {
         repositoryIdentity: door.repositoryIdentity,
@@ -181,14 +198,14 @@ export async function occupyFromWorkspaceHome(input: {
       alias ? { alias, harness } : { harness },
     );
   }
-  const result = opened.value as {
+  const occupied = result.value as {
     readonly workspaceId: string;
     readonly attach?: SandboxAgentAttachDescriptor;
   };
-  if (!result.attach) throw occupyLiveSessionMissingError();
+  if (!occupied.attach) throw occupyLiveSessionMissingError();
   return {
-    workspaceId: result.workspaceId,
-    attach: result.attach,
+    workspaceId: occupied.workspaceId,
+    attach: occupied.attach,
     ...(door.projectName ? { projectName: door.projectName } : {}),
   };
 }

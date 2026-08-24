@@ -448,7 +448,7 @@ export function scratchRemoteRejectedError(): DomainError {
   });
 }
 
-function isFolderLocalDoor(door?: {
+export function isFolderLocalDoor(door?: {
   readonly repositoryIdentity?: string;
   readonly repository?: string;
 }): boolean {
@@ -819,12 +819,19 @@ function occupancyCloudTemporarilyUnreachableError(
   };
 }
 
-function isUnstructuredCloudValidation(error: DomainError): boolean {
+export function isUnstructuredCloudValidation(error: DomainError): boolean {
   return (
     isBareInputValidationFailed(error) &&
     (error.details?.phase === "orpc-error-normalization" ||
       error.details?.orpcCode === "BAD_REQUEST")
   );
+}
+
+export function workspaceOpenInputForOlderCloud<
+  T extends { readonly targetServerId?: string; readonly projectId?: string },
+>(input: T): Omit<T, "targetServerId" | "projectId"> {
+  const { targetServerId: _targetServerId, projectId: _projectId, ...rest } = input;
+  return rest;
 }
 
 function stringDetailList(value: unknown): readonly string[] {

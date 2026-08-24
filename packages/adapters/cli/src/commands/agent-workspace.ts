@@ -119,7 +119,9 @@ import {
 import { type OccupancyHarness, resolveOccupancyAgent } from "../occupancy-vendor.js";
 import {
   formatRemoteCodeBanner,
+  isFolderLocalDoor,
   isRemoteCodeGitRemoteLocator,
+  isUnstructuredCloudValidation,
   isWorkspaceGitRootUnavailable,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
@@ -136,6 +138,7 @@ import {
   resolveWorkspaceOpenSource,
   scratchRemoteRejectedError,
   selectWorkspaceOpenTargetServerId,
+  workspaceOpenInputForOlderCloud,
   writeOccupancySessionHints,
 } from "../remote-code-session.js";
 import {
@@ -909,7 +912,18 @@ export const workspaceCodeCommand = EffectCommand.make(
             );
         const door = pinRemoteCodeDoorServer(resolvedDoor, explicitServerId);
         const selectedProfile = occupancyCodeProfile(selectedHarness, optionalValue(profile));
-        const openInput = {
+        const openInput: {
+          repository: string;
+          repositoryIdentity: string;
+          ref: string;
+          branch: string;
+          commitSha: string;
+          targetServerId?: string;
+          attach: boolean;
+          forceNew: boolean;
+          profile?: string;
+          projectId?: string;
+        } = {
           repository: door.repository,
           repositoryIdentity: door.repositoryIdentity,
           ref: door.ref,
@@ -945,13 +959,25 @@ export const workspaceCodeCommand = EffectCommand.make(
               onProgress(occupancyOpeningProgress(door.serverName), { status: "retrying" });
             },
           });
-        const opened = await openDisk(command.value);
+        let openForCloud = openInput;
+        let opened = await openDisk(command.value);
+        if (
+          opened.isErr() &&
+          isUnstructuredCloudValidation(opened.error) &&
+          (openForCloud.targetServerId || openForCloud.projectId) &&
+          !isFolderLocalDoor(door)
+        ) {
+          openForCloud = workspaceOpenInputForOlderCloud(openInput);
+          const compat = OpenAgentWorkspaceCommand.create(openForCloud);
+          if (compat.isErr()) throw compat.error;
+          opened = await openDisk(compat.value);
+        }
         if (opened.isOk()) {
           return { door, result: opened.value, bannerCommitSha: door.commitSha };
         }
         if (isOccupancyPartialRecovery(opened.error) && !forceNew) {
           const replace = OpenAgentWorkspaceCommand.create({
-            ...openInput,
+            ...openForCloud,
             forceNew: true,
           });
           if (replace.isErr()) throw replace.error;
@@ -975,7 +1001,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         const details = opened.error.details;
         if (details?.code === "workspace_open_source_pin_mismatch" && !forceNew) {
           const replace = OpenAgentWorkspaceCommand.create({
-            ...openInput,
+            ...openForCloud,
             forceNew: true,
           });
           if (replace.isErr()) throw replace.error;
