@@ -488,8 +488,7 @@ export function occupancyRetryAgentFlag(agent?: {
 export const DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS = 4;
 export const OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS = Number.POSITIVE_INFINITY;
 export const DEFAULT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = 750;
-export const DEFAULT_OCCUPY_DISK_GATEWAY_DEADLINE_MS = 60_000;
-export const DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_MS = 20_000;
+export const DEFAULT_OCCUPY_DISK_GATEWAY_DEADLINE_MS = 180_000;
 export const OCCUPY_DISK_GATEWAY_RETRY_DELAY_ENV = "APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS";
 export const OCCUPY_DISK_GATEWAY_DEADLINE_ENV = "APPALOFT_OCCUPY_DISK_GATEWAY_DEADLINE_MS";
 export const OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_ENV =
@@ -512,11 +511,13 @@ export function occupyDiskGatewayDeadlineMs(env: NodeJS.ProcessEnv = process.env
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_OCCUPY_DISK_GATEWAY_DEADLINE_MS;
 }
 
-export function occupyDiskGatewayAttemptTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
-  const parsed = Number(env[OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_ENV]);
-  return Number.isFinite(parsed) && parsed >= 0
-    ? parsed
-    : DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_MS;
+export function occupyDiskGatewayAttemptTimeoutMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number | undefined {
+  const raw = env[OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_ENV];
+  if (raw === undefined || raw === "") return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 export function occupyDiskPrepCancelledError(): DomainError {

@@ -9,6 +9,9 @@ import { folderOccupancyIdentity } from "../src/folder-project-link.js";
 import { OCCUPANCY_CODE_PROGRESS } from "../src/occupancy-code-progress.js";
 import {
   DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS,
+  DEFAULT_OCCUPY_DISK_GATEWAY_DEADLINE_MS,
+  occupyDiskGatewayAttemptTimeoutMs,
+  occupyDiskGatewayDeadlineMs,
   occupyDiskPrepCancelledError,
   occupyLiveSessionMissingError,
   WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE,
@@ -424,6 +427,23 @@ describe("remote code door", () => {
       expect(opened.value).toEqual({ workspaceId: "ws_live", attach: { sessionId: "term_1" } });
     }
   });
+  test("[WS-REMOTE-PROGRESS-223] TTY occupy does not default-cap a disk-prep attempt at 20s", async () => {
+    expect(DEFAULT_OCCUPY_DISK_GATEWAY_DEADLINE_MS).toBe(180_000);
+    expect(occupyDiskGatewayAttemptTimeoutMs({})).toBeUndefined();
+    expect(occupyDiskGatewayDeadlineMs({})).toBe(180_000);
+    expect(
+      occupyDiskGatewayAttemptTimeoutMs({
+        APPALOFT_OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_MS: "20000",
+      }),
+    ).toBe(20_000);
+    const opened = await openWorkspaceWithOccupyDiskGatewayRetry(
+      async () => ok({ workspaceId: "ws_slow_disk" }),
+      { delayMs: 0, attempts: Number.POSITIVE_INFINITY, deadlineMs: 200 },
+    );
+    expect(opened.isOk()).toBeTrue();
+    if (opened.isOk()) expect(opened.value).toEqual({ workspaceId: "ws_slow_disk" });
+  });
+
   test("[WS-REMOTE-PROGRESS-224] cancelled and missing-session errors omit Opening folder.local", async () => {
     const { formatHumanCliError } = await import("../src/runtime.js");
     const cancelled = occupyDiskPrepCancelledError();
