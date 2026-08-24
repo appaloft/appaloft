@@ -265,12 +265,15 @@ describe("CI change classifier", () => {
     rmSync(directory, { force: true, recursive: true });
   });
 
-  test("[CI-E2E-SCOPE-001] isolated apps/web files run WebView only", () => {
+  test("[CI-E2E-SCOPE-001] isolated apps/dashboard files run WebView only", () => {
     const webOnlySets = [
-      ["apps/web/src/routes/+page.svelte"],
-      ["apps/web/src/lib/console/header-switcher.test.ts", "docs/TESTING.md"],
-      ["apps/web/test/e2e-webview/home.webview.test.ts", "apps/web/package.json"],
-      ["apps/web/static/favicon.svg", "LICENSE"],
+      ["apps/dashboard/src/routes/[...route]/+page.svelte"],
+      ["apps/dashboard/src/lib/navigation.test.ts", "docs/TESTING.md"],
+      [
+        "apps/dashboard/test/e2e-dashboard/foundation.webview.test.ts",
+        "apps/dashboard/package.json",
+      ],
+      ["apps/dashboard/src/app.html", "LICENSE"],
     ];
 
     for (const files of webOnlySets) {
@@ -315,11 +318,14 @@ describe("CI change classifier", () => {
     }
   });
 
-  test("[CI-E2E-SCOPE-003] mixed web+product, empty diffs, and force stay full E2E", () => {
+  test("[CI-E2E-SCOPE-003] mixed Dashboard+product, empty diffs, and force stay full E2E", () => {
     const fullSets = [
-      ["apps/shell/test/e2e/certificates.command.e2e.ts", "apps/web/src/routes/+page.svelte"],
-      ["apps/web/src/routes/+page.svelte", "package.json"],
-      ["apps/web/src/routes/+page.svelte", "packages/core/src/index.ts"],
+      [
+        "apps/shell/test/e2e/certificates.command.e2e.ts",
+        "apps/dashboard/src/routes/[...route]/+page.svelte",
+      ],
+      ["apps/dashboard/src/routes/[...route]/+page.svelte", "package.json"],
+      ["apps/dashboard/src/routes/[...route]/+page.svelte", "packages/core/src/index.ts"],
     ];
 
     for (const files of fullSets) {
@@ -437,13 +443,13 @@ describe("CI change classifier", () => {
     expect(unitTestsJob).toContain("run: bun run test");
     expect(unitTestsJob).not.toMatch(/\btest:e2e(?::webview)?\b/);
     expect(ciWorkflow).toContain("name: ci");
-    expect(e2eWorkflow).toContain("name: Web WebView Smoke");
+    expect(e2eWorkflow).toContain("name: Dashboard WebView Smoke");
     expect(e2eWorkflow).toContain("run: bun run test:e2e");
 
     const webPackageJson = JSON.parse(
-      readFileSync(join(root, "apps/web/package.json"), "utf8"),
+      readFileSync(join(root, "apps/dashboard/package.json"), "utf8"),
     ) as { scripts?: Record<string, string> };
-    expect(webPackageJson.scripts?.test).toBe("bun run test:unit -- --run");
+    expect(webPackageJson.scripts?.test).toContain("vitest --run");
     expect(webPackageJson.scripts?.test).not.toMatch(/\btest:e2e(?::webview)?\b/);
     expect(webPackageJson.scripts?.["test:e2e"]).toBeTruthy();
     expect(webPackageJson.scripts?.["test:e2e:webview"]).toBeTruthy();
@@ -456,7 +462,7 @@ describe("CI change classifier", () => {
     expect(e2eWorkflow).toContain("name: Skip E2E");
     expect(e2eWorkflow).toContain("name: Decide shard work");
     expect(e2eWorkflow).toContain("name: Start Postgres");
-    expect(e2eWorkflow).toContain("name: Web WebView Smoke");
+    expect(e2eWorkflow).toContain("name: Dashboard WebView Smoke");
     expect(e2eWorkflow).toContain("name: Shell CLI + HTTP E2E");
     expect(e2eWorkflow).not.toContain("e2e-skip:");
     expect(e2eWorkflow).not.toMatch(/^ {4}services:\s*$/m);
@@ -533,7 +539,7 @@ describe("CI change classifier", () => {
     expect(workspaceTuiRequired("tui_full")).toBe(true);
     expect(
       classifyChangedFiles([
-        "apps/web/src/routes/+page.svelte",
+        "apps/dashboard/src/routes/[...route]/+page.svelte",
         "apps/workspace-control-tui/src/lib.rs",
       ]),
     ).toMatchObject({

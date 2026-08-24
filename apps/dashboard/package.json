@@ -15,6 +15,7 @@
     "check:bundle": "bun run build && bun run scripts/check-bundle-budget.ts",
     "test": "vitest --run --exclude 'test/e2e-dashboard/**'",
     "test:unit": "vitest --run --exclude 'test/e2e-dashboard/**'",
+    "test:e2e": "bun run test:e2e:webview",
     "test:e2e:webview": "bun run build && bun test --timeout=60000 test/e2e-dashboard/foundation.webview.test.ts"
   },
   "devDependencies": {
