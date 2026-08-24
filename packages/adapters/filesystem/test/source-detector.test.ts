@@ -27,6 +27,10 @@ async function createWorkspace(name: string): Promise<string> {
   return mkdtemp(join(tmpdir(), `appaloft-source-${name}-`));
 }
 
+async function createGenericProjectsParent(): Promise<string> {
+  return mkdtemp(join(tmpdir(), "projects-"));
+}
+
 describe("FileSystemSourceDetector", () => {
   test("[WF-PLAN-DET-001][WF-PLAN-DET-007] records manifest package manager and serverful shape", async () => {
     ensureReflectMetadata();
@@ -361,7 +365,7 @@ describe("FileSystemSourceDetector", () => {
       import("@appaloft/application"),
       import("../src"),
     ]);
-    const parent = "/Users/nichenqin/projects";
+    const parent = await createGenericProjectsParent();
     const folder = `${parent}/nux-67e3a052-static`;
 
     const result = await new FileSystemSourceDetector().detect(
@@ -388,7 +392,7 @@ describe("FileSystemSourceDetector", () => {
       import("@appaloft/application"),
       import("../src"),
     ]);
-    const parent = "/Users/nichenqin/projects";
+    const parent = await createGenericProjectsParent();
 
     const result = await new FileSystemSourceDetector().detect(
       createExecutionContext({ entrypoint: "cli", requestId: "req_keep_hyphenated_name" }),
@@ -410,7 +414,7 @@ describe("FileSystemSourceDetector", () => {
       { createExecutionContext, CLI_RESOLVED_SOURCE_METADATA_KEY },
       { FileSystemSourceDetector },
     ] = await Promise.all([import("@appaloft/application"), import("../src")]);
-    const parent = "/Users/nichenqin/projects";
+    const parent = await createGenericProjectsParent();
     const cliResolvedSource = `${parent}/nux-772b6112-static`;
 
     const result = await new FileSystemSourceDetector().detect(
@@ -438,7 +442,7 @@ describe("FileSystemSourceDetector", () => {
       { createExecutionContext, CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY },
       { FileSystemSourceDetector },
     ] = await Promise.all([import("@appaloft/application"), import("../src")]);
-    const parent = "/Users/nichenqin/projects";
+    const parent = await createGenericProjectsParent();
     const leaf = "nux-d73d53b6-static";
     const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
 
@@ -466,7 +470,7 @@ describe("FileSystemSourceDetector", () => {
       { createExecutionContext, CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY },
       { FileSystemSourceDetector },
     ] = await Promise.all([import("@appaloft/application"), import("../src")]);
-    const parent = "/Users/nichenqin/projects";
+    const parent = await createGenericProjectsParent();
     const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
 
     const result = await new FileSystemSourceDetector().detect(
@@ -491,7 +495,7 @@ describe("FileSystemSourceDetector", () => {
       { createExecutionContext, CLI_RESOLVED_SOURCE_METADATA_KEY },
       { FileSystemSourceDetector },
     ] = await Promise.all([import("@appaloft/application"), import("../src")]);
-    const parent = "/Users/nichenqin/projects";
+    const parent = await createGenericProjectsParent();
 
     const result = await new FileSystemSourceDetector().detect(
       createExecutionContext({ entrypoint: "cli", requestId: "req_no_cli_resolved_parent" }),
@@ -512,7 +516,8 @@ describe("FileSystemSourceDetector", () => {
       import("@appaloft/application"),
       import("../src"),
     ]);
-    const locator = "/Users/nichenqin/projects/nux-9859a0e9-static";
+    const parent = await createGenericProjectsParent();
+    const locator = join(parent, "nux-9859a0e9-static");
 
     const result = await new FileSystemSourceDetector().detect(
       createExecutionContext({ entrypoint: "cli", requestId: "req_missing_hyphenated" }),
@@ -522,7 +527,7 @@ describe("FileSystemSourceDetector", () => {
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap().source.locator).toBe(locator);
-    expect(result._unsafeUnwrap().source.locator).not.toBe("/Users/nichenqin/projects");
+    expect(result._unsafeUnwrap().source.locator).not.toBe(parent);
     expect(result._unsafeUnwrap().source.kind).toBe("local-folder");
   });
 

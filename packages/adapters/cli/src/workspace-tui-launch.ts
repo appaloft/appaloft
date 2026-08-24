@@ -623,6 +623,7 @@ export function workspaceControlRendererBinaryCandidates(
   const executable =
     process.platform === "win32" ? "appaloft-workspace-tui.exe" : "appaloft-workspace-tui";
   const configured = environment.APPALOFT_WORKSPACE_TUI_BINARY;
+  if (configured) return [isAbsolute(configured) ? configured : resolve(configured)];
   const pathDirs = (environment.PATH ?? process.env.PATH ?? "").split(delimiter).filter(Boolean);
   const crateTargets = workspaceControlRendererSearchRoots(environment).flatMap((root) => {
     const crate = join(root, "apps", "workspace-control-tui");
@@ -632,7 +633,6 @@ export function workspaceControlRendererBinaryCandidates(
     ];
   });
   return [
-    ...(configured ? [isAbsolute(configured) ? configured : resolve(configured)] : []),
     join(dirname(process.execPath), executable),
     ...pathDirs.map((dir) => join(dir, executable)),
     ...crateTargets,

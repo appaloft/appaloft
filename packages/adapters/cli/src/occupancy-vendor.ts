@@ -240,7 +240,9 @@ export async function detectOccupancyVendor(input: {
   readonly env?: NodeJS.ProcessEnv;
   readonly which?: (name: string) => string | null | undefined;
 }): Promise<OccupancyVendor | undefined> {
-  const which = input.which ?? ((name: string) => Bun.which(name));
+  const which =
+    input.which ??
+    ((name: string) => Bun.which(name, { PATH: input.env?.PATH ?? process.env.PATH ?? "" }));
   for (const vendor of OCCUPANCY_VENDORS) {
     if (await occupancyVendorCredentialPresent(vendor, input)) return vendor;
   }

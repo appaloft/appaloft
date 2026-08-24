@@ -2,7 +2,7 @@ import { CLI_PACKED_SOURCE_ARCHIVE_MAX_BYTES } from "@appaloft/application";
 import { describe, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -193,13 +193,13 @@ describe("CLI-host local source package", () => {
       process.env.PWD = parent;
 
       const fromDot = cliHostLocalFolderSourceSendFields(".");
-      expect(fromDot.folder).toBe(resolve(folder));
-      expect(fromDot.folder).not.toBe(resolve(parent));
+      expect(fromDot.folder).toBe(realpathSync(folder));
+      expect(fromDot.folder).not.toBe(realpathSync(parent));
       expect(fromDot.packedSourceArchiveTarGz?.length).toBeGreaterThan(0);
 
       const fromParent = cliHostLocalFolderSourceSendFields(parent);
-      expect(fromParent.folder).toBe(resolve(folder));
-      expect(fromParent.folder).not.toBe(resolve(parent));
+      expect(fromParent.folder).toBe(realpathSync(folder));
+      expect(fromParent.folder).not.toBe(realpathSync(parent));
       expect(fromParent.packedSourceArchiveTarGz?.length).toBeGreaterThan(0);
 
       const listingDir = mkdtempSync(join(tmpdir(), "appaloft-cli-send-nux-list-"));
