@@ -119,6 +119,7 @@ import {
 import { type OccupancyHarness, resolveOccupancyAgent } from "../occupancy-vendor.js";
 import {
   formatRemoteCodeBanner,
+  isFolderLocalDoor,
   isRemoteCodeGitRemoteLocator,
   isUnstructuredCloudValidation,
   isWorkspaceGitRootUnavailable,
@@ -963,7 +964,8 @@ export const workspaceCodeCommand = EffectCommand.make(
         if (
           opened.isErr() &&
           isUnstructuredCloudValidation(opened.error) &&
-          (openForCloud.targetServerId || openForCloud.projectId)
+          (openForCloud.targetServerId || openForCloud.projectId) &&
+          !isFolderLocalDoor(door)
         ) {
           openForCloud = workspaceOpenInputForOlderCloud(openInput);
           const compat = OpenAgentWorkspaceCommand.create(openForCloud);

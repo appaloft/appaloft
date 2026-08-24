@@ -15,6 +15,7 @@ import {
   saveOccupancyAgentPreference,
 } from "./occupancy-vendor.js";
 import {
+  isFolderLocalDoor,
   isUnstructuredCloudValidation,
   occupancyCloudCompatError,
   occupyLiveSessionMissingError,
@@ -177,7 +178,8 @@ export async function occupyFromWorkspaceHome(input: {
     if (opened.isOk()) return opened;
     if (
       !isUnstructuredCloudValidation(opened.error as DomainError) ||
-      (!openInput.targetServerId && !openInput.projectId)
+      (!openInput.targetServerId && !openInput.projectId) ||
+      isFolderLocalDoor(door)
     ) {
       return opened;
     }

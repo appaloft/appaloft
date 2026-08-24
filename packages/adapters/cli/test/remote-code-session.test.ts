@@ -21,6 +21,7 @@ import {
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
+  openWorkspaceWithOccupyDiskGatewayRetry,
   workspaceOpenInputForOlderCloud,
   pinRemoteCodeDoorServer,
   REMOTE_CODE_DOOR_HINT,

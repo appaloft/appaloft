@@ -448,7 +448,7 @@ export function scratchRemoteRejectedError(): DomainError {
   });
 }
 
-function isFolderLocalDoor(door?: {
+export function isFolderLocalDoor(door?: {
   readonly repositoryIdentity?: string;
   readonly repository?: string;
 }): boolean {
