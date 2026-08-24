@@ -64,6 +64,6 @@
 - [x] Package both default and rollback binary bundles, then complete a real isolated-PGlite
       first-admin -> sign-in -> Projects acceptance loop on the default bundle.
 - [x] Enable opt-in beta only after DASH-BETA rows pass.
-- [ ] Enable default only after all DASH-DEFAULT rows pass.
+- [x] Enable default only after all DASH-DEFAULT rows pass.
 - [ ] Run independent Public/Private Boundary Review after public implementation and merge.
 - [ ] Record public PR/final main SHA before any downstream hosted pin/cutover.
