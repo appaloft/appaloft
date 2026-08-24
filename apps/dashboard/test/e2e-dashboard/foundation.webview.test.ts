@@ -50,6 +50,16 @@ const evidenceDirectory =
 let previewServer: ReturnType<typeof Bun.serve> | undefined;
 let apiFixtureServer: ReturnType<typeof Bun.serve> | undefined;
 const apiFixtureRequests: string[] = [];
+const dashboardInfrastructureRequests = new Set([
+  "/api/auth/public-config.js",
+  "/api/auth/session",
+]);
+
+function businessApiRequests(): string[] {
+  return apiFixtureRequests.filter(
+    (path) => path.startsWith("/api/") && !dashboardInfrastructureRequests.has(path),
+  );
+}
 const apiFixtureCommands: string[] = [];
 const apiFixtureQueries: string[] = [];
 let extensionFixtureEnabled = false;
@@ -833,6 +843,19 @@ beforeAll(async () => {
               { headers: { "content-type": "application/javascript; charset=utf-8" } },
             );
           }
+          if (pathname === "/api/auth/session") {
+            return Response.json({
+              accountSecurity: { enabled: true, passwordState: "set" },
+              accountRecovery: { enabled: true },
+              enabled: true,
+              emailVerification: { enabled: false, otpEnabled: false, required: false },
+              provider: "better-auth",
+              loginRequired: true,
+              deferredAuth: false,
+              session: { user: { id: "usr_dashboard" } },
+              providers: [],
+            });
+          }
           if (pathname === "/api/system-plugins/web-extensions") {
             return Response.json({
               items: extensionFixtureEnabled
@@ -1210,11 +1233,7 @@ describe("Dashboard foundation WebView", () => {
       () => view.evaluate<number>(`document.querySelectorAll('[data-project-card]').length`),
       (count) => count === 13,
     );
-    expect(
-      apiFixtureRequests.filter(
-        (path) => path.startsWith("/api/") && path !== "/api/auth/public-config.js",
-      ),
-    ).toHaveLength(2);
+    expect(businessApiRequests()).toHaveLength(2);
     expect(
       apiFixtureRequests.filter((path) => path === "/api/rpc/projects/listSummaries"),
     ).toHaveLength(1);
@@ -1236,11 +1255,7 @@ describe("Dashboard foundation WebView", () => {
       await view.evaluate<number>(`document.querySelectorAll('a[href*="/resources/"]').length`),
     ).toBeLessThanOrEqual(50);
     expect(await view.evaluate<string>(`document.body.textContent ?? ''`)).toContain("service-050");
-    expect(
-      apiFixtureRequests.filter(
-        (path) => path.startsWith("/api/") && path !== "/api/auth/public-config.js",
-      ),
-    ).toHaveLength(2);
+    expect(businessApiRequests()).toHaveLength(2);
     expect(
       apiFixtureRequests.filter((path) => path === "/api/rpc/projects/environmentOverview"),
     ).toHaveLength(1);
@@ -1254,11 +1269,7 @@ describe("Dashboard foundation WebView", () => {
       () => view.evaluate<string>(`document.body.textContent ?? ''`),
       (content) => content.includes("dep_atlas"),
     );
-    expect(
-      apiFixtureRequests.filter(
-        (path) => path.startsWith("/api/") && path !== "/api/auth/public-config.js",
-      ),
-    ).toHaveLength(3);
+    expect(businessApiRequests()).toHaveLength(3);
     expect(
       apiFixtureRequests.filter((path) => path === "/api/rpc/resources/overview"),
     ).toHaveLength(1);

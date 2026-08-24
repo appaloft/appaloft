@@ -17,3 +17,13 @@ export function authErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message.trim();
   return "The authentication request could not be completed.";
 }
+
+export function dashboardAuthRedirect(input: {
+  readonly currentPath: string;
+  readonly loginRequired: boolean;
+  readonly hasSession: boolean;
+}): string | null {
+  if (!input.loginRequired || input.hasSession) return null;
+  const next = safeDashboardReturnPath(input.currentPath);
+  return `/login?next=${encodeURIComponent(next)}`;
+}
