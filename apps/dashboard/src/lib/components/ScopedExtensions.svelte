@@ -9,9 +9,9 @@
     type ActiveScopedExtension,
     type ConsoleExtensionPageDocumentV1,
   } from "$lib/extensions";
-  import { dashboardClient } from "$lib/data-client";
   import { dashboardI18n as i18n } from "$lib/i18n.svelte";
   import type { DashboardRoute } from "$lib/navigation";
+  import { loadDashboardOrganizationContext } from "$lib/organization-context";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
   let { route }: { route: DashboardRoute } = $props();
@@ -27,22 +27,16 @@
 
   let extensionsPromise: Promise<SystemPluginWebExtension[]> | undefined;
   const visibilityCache = new Map<string, Promise<boolean>>();
-  let organizationContextPromise:
-    | Promise<{ organizationId: string; organizationRole: string } | null>
-    | undefined;
-
   function loadOrganizationContext(): Promise<{
     organizationId: string;
     organizationRole: string;
   } | null> {
-    organizationContextPromise ??= dashboardClient.organizations
-      .currentContext({})
+    return loadDashboardOrganizationContext()
       .then((context) => ({
         organizationId: context.currentOrganization.organizationId,
         organizationRole: context.currentOrganization.role,
       }))
       .catch(() => null);
-    return organizationContextPromise;
   }
 
   function loadExtensions(): Promise<SystemPluginWebExtension[]> {

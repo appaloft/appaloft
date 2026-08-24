@@ -3,6 +3,7 @@
   import { CheckCircle2, LoaderCircle, RefreshCw, Save, ShieldCheck, TriangleAlert, Users } from "@lucide/svelte";
   import { dashboardClient } from "$lib/data-client";
   import { dashboardI18n as i18n } from "$lib/i18n.svelte";
+  import { loadDashboardOrganizationContext } from "$lib/organization-context";
   import WorkspaceExtensionDirectory from "./WorkspaceExtensionDirectory.svelte";
 
   type Context = Awaited<ReturnType<typeof dashboardClient.organizations.currentContext>>;
@@ -15,7 +16,7 @@
   async function load(): Promise<void> {
     loading = true; error = false;
     try {
-      context = await dashboardClient.organizations.currentContext({});
+      context = await loadDashboardOrganizationContext();
       const organizationId = context.currentOrganization.organizationId;
       [profile, members] = await Promise.all([
         dashboardClient.organizations.showProfile({ organizationId }),

@@ -1061,7 +1061,7 @@ describe("Dashboard foundation WebView", () => {
         name: "workspace-settings-desktop-light",
         path: "/settings",
         selector: "[data-workspace-settings]",
-        operation: "/api/rpc/organizations/currentContext",
+        operation: "/api/rpc/organizations/showProfile",
       },
       {
         name: "project-deployments-desktop-light",

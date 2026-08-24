@@ -19,7 +19,6 @@
   } from "@lucide/svelte";
   import { onMount } from "svelte";
 
-  import { dashboardClient } from "$lib/data-client";
   import { dashboardCopy as copy, commonCopy, dashboardI18n as i18n } from "$lib/i18n.svelte";
   import {
     projectDestinationHref,
@@ -30,6 +29,7 @@
     type WorkspaceDestination,
   } from "$lib/navigation";
   import { dashboardProjectContext } from "$lib/project-context.svelte";
+  import { loadDashboardOrganizationContext } from "$lib/organization-context";
   import { dashboardTheme } from "$lib/theme.svelte";
 
   import ProjectPreview from "./ProjectPreview.svelte";
@@ -52,7 +52,7 @@
 
   onMount(async () => {
     try {
-      const context = await dashboardClient.organizations.currentContext({});
+      const context = await loadDashboardOrganizationContext();
       workspaceName = context.currentOrganization.name;
     } catch {
       workspaceName = "";
