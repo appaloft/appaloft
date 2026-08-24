@@ -12,6 +12,11 @@ import {
   folderOccupancyIdentity,
   writeFolderProjectLink,
 } from "../src/folder-project-link.js";
+import {
+  fileFolderLocalResumeStore,
+  readFolderLocalResume,
+  writeFolderLocalResume,
+} from "../src/folder-local-resume.js";
 
 function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
@@ -56,6 +61,7 @@ function hostingerFolderLocalFetch(input: {
     readonly sandboxId: string;
     readonly commitSha?: string;
     readonly runtimeId?: string;
+    readonly includeOccupancy?: boolean;
   };
   readonly leftoverBindingProjectId?: string;
   readonly leftoverListedProjects?: readonly {
@@ -150,11 +156,16 @@ function hostingerFolderLocalFetch(input: {
               {
                 sandboxId: input.leftover.sandboxId,
                 status: input.leftover.runtimeId ? "ready" : "creating",
-                occupancy: {
-                  repositoryIdentity: folderOccupancyIdentity(input.projectName),
-                  commitSha: input.leftover.commitSha ?? "cafef00d00000000000000000000000000000000",
-                  branch: "local",
-                },
+                ...(input.leftover.includeOccupancy === false
+                  ? {}
+                  : {
+                      occupancy: {
+                        repositoryIdentity: folderOccupancyIdentity(input.projectName),
+                        commitSha:
+                          input.leftover.commitSha ?? "cafef00d00000000000000000000000000000000",
+                        branch: "local",
+                      },
+                    }),
                 ...(input.leftover.runtimeId ? { runtimeId: input.leftover.runtimeId } : {}),
               },
             ]
@@ -201,11 +212,13 @@ function hostingerFolderLocalFetch(input: {
         },
       });
     }
-    if (path === "/api/sandboxes/sbx_partial/resume" && request.method === "POST") {
-      return jsonResponse({ sandboxId: "sbx_partial", status: "ready" });
-    }
-    if (path === "/api/sandboxes/sbx_partial/terminate" && request.method === "POST") {
-      return jsonResponse({ sandboxId: "sbx_partial", status: "terminated" });
+    const sandboxAction = path.match(/^\/api\/sandboxes\/([^/]+)\/(resume|terminate)$/u);
+    if (sandboxAction && request.method === "POST") {
+      const sandboxId = sandboxAction[1] ?? "sbx_folder_local";
+      return jsonResponse({
+        sandboxId,
+        status: sandboxAction[2] === "terminate" ? "terminated" : "ready",
+      });
     }
     if (path.endsWith("/agent-runtimes") && request.method === "POST") {
       const sandboxId = path.split("/")[3] ?? "sbx_folder_local";
@@ -390,6 +403,119 @@ describe("logged-in folder.local remote occupy", () => {
     expect(captured.text).not.toContain("workspace_open_partial_recovery_required");
     expect(captured.text).not.toContain("use --new");
     expect(process.exitCode === undefined || process.exitCode === 0).toBe(true);
+  });
+
+  test("[WS-REMOTE-PROGRESS-231] local resume cache reopens leftover disk without occupancy identity or create", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "nux-code-resume-cache-cwd-"));
+    const home = await mkdtemp(join(tmpdir(), "nux-code-resume-cache-home-"));
+    const requests: Request[] = [];
+    const projectName = basename(emptyDir);
+    await writeFolderLocalResume(
+      {
+        repositoryIdentity: folderOccupancyIdentity(projectName),
+        workspaceId: "sbx_cached",
+        targetServerId: "srv_4lifk0yrcecy",
+      },
+      fileFolderLocalResumeStore({ APPALOFT_HOME: home }),
+    );
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: {
+        name: "cloud",
+        mode: "self-hosted",
+        baseUrl: "https://api.example.test",
+        auth: { kind: "bearer", token: "tok_remote" },
+        createdAt: "2026-08-20T00:00:00.000Z",
+        updatedAt: "2026-08-20T00:00:00.000Z",
+      },
+      fetch: hostingerFolderLocalFetch({
+        requests,
+        projectId: "prj_7fky4yjn1l1c",
+        projectName,
+        leftover: { sandboxId: "sbx_cached", includeOccupancy: false },
+      }),
+      now: () => "2026-08-20T00:00:00.000Z",
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const originalExitCode = process.exitCode;
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(emptyDir);
+      await captureProcessOutput(() =>
+        program.parseAsync(["node", "appaloft", "code", "--no-attach"]),
+      );
+    } finally {
+      process.chdir(previousCwd);
+      process.exitCode = originalExitCode ?? 0;
+      await rm(emptyDir, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+
+    const paths = requests.map(requestKey);
+    expect(paths).not.toContain("POST /api/sandboxes");
+    expect(paths).toContain("POST /api/sandboxes/sbx_cached/resume");
+    expect(paths).toContain("POST /api/sandboxes/sbx_cached/agent-runtimes");
+    expect(process.exitCode === undefined || process.exitCode === 0).toBe(true);
+  });
+
+  test("[WS-REMOTE-PROGRESS-231] first folder.local create writes a local resume cache", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "nux-code-resume-write-cwd-"));
+    const home = await mkdtemp(join(tmpdir(), "nux-code-resume-write-home-"));
+    const requests: Request[] = [];
+    const projectName = basename(emptyDir);
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: {
+        name: "cloud",
+        mode: "self-hosted",
+        baseUrl: "https://api.example.test",
+        auth: { kind: "bearer", token: "tok_remote" },
+        createdAt: "2026-08-20T00:00:00.000Z",
+        updatedAt: "2026-08-20T00:00:00.000Z",
+      },
+      fetch: hostingerFolderLocalFetch({
+        requests,
+        projectId: "prj_7fky4yjn1l1c",
+        projectName,
+      }),
+      now: () => "2026-08-20T00:00:00.000Z",
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const originalExitCode = process.exitCode;
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(emptyDir);
+      await captureProcessOutput(() =>
+        program.parseAsync(["node", "appaloft", "code", "--no-attach"]),
+      );
+      const cached = await readFolderLocalResume(
+        {
+          repositoryIdentity: folderOccupancyIdentity(projectName),
+        },
+        fileFolderLocalResumeStore({ APPALOFT_HOME: home }),
+      );
+      expect(cached?.workspaceId).toBe("sbx_folder_local");
+      expect(cached?.runtimeId).toMatch(/^sar_/);
+    } finally {
+      process.chdir(previousCwd);
+      process.exitCode = originalExitCode ?? 0;
+      await rm(emptyDir, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+
+    expect(requests.map(requestKey)).toContain("POST /api/sandboxes");
   });
 
   test("[FOLDER-ONBOARD-007] leftover binding project does not leak into the Remote banner", async () => {

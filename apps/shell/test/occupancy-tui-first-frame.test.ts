@@ -30,9 +30,11 @@ describe("occupancy TUI first frame", () => {
     expect(frame.startsWith(OCCUPANCY_ALT_SCREEN)).toBeTrue();
     expect(frame).toContain(OCCUPANCY_FIRST_FRAME_CHROME);
     expect(frame).toContain(OCCUPANCY_FIRST_FRAME_TITLE);
-    expect(frame).toContain(
-      `\x1b[H${OCCUPANCY_FIRST_FRAME_CHROME}\r\n${OCCUPANCY_FIRST_FRAME_TITLE}`,
-    );
+    expect(frame).toContain("Checking login");
+    expect(frame).toContain("Preparing skills");
+    expect(frame).toContain("Preparing disk");
+    expect(frame).toContain("╭");
+    expect(frame).toContain("╰");
     expect(frame).not.toContain("\x1b[11;");
     expect(occupancyFirstFrameChromeForWidth(19)).toBe("Appaloft Cloud");
     expect(occupancyFirstFrameChromeForWidth(19)).not.toContain("Agen");
@@ -44,6 +46,7 @@ describe("occupancy TUI first frame", () => {
     expect(written.startsWith(OCCUPANCY_ALT_SCREEN)).toBeTrue();
     expect(written).toContain(OCCUPANCY_FIRST_FRAME_CHROME);
     expect(written).toContain(OCCUPANCY_FIRST_FRAME_TITLE);
+    expect(written).toContain("Preparing disk");
     expect(written).not.toMatch(/occupancy/iu);
   });
 

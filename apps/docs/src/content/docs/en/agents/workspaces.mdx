@@ -62,10 +62,13 @@ is not Workspace truth, and dirty files are not uploaded. A positional git remot
 (`https://`, `ssh://`, or `git@host:path`) occupies that repository without a local
 clone. On a TTY, default `code` opens the Cloud Agents TUI (alt screen)
 immediately with the workspace list **collapsed**, so the wait gets the whole
-window. The centered panel shows a title spinner and **preparing the agent**,
-then occupy / copy skills / attach as a left-aligned step list (Braille spinner,
-then ✓). Attach replaces that wait in the same fullscreen pane. `workspace` opens
-the same TUI as a navigator. They do not stream status lines as the primary UX.
+window. The parent first frame is already the centered wait panel (**preparing
+the agent** plus Checking login / Preparing skills / Preparing disk), not an
+empty two-line splash. Occupy / copy skills / attach stay a left-aligned step
+list (Braille spinner, then ✓). Attach replaces that wait in the same fullscreen
+pane. Reopening the same folder resumes the last live disk instead of creating
+another one. `workspace` opens the same TUI as a navigator. They do not stream
+status lines as the primary UX.
 HOME skill copy is fail-soft and time-bounded; a timeout does not block occupy.
 `--server` pins the enrolled Server with the same meaning as `workspace open --server`.
 `--no-attach` and non-TTY scripts

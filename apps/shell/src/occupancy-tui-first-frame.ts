@@ -5,6 +5,12 @@ export const OCCUPANCY_LEAVE_ALT_SCREEN = "\x1b[?25h\x1b[?1049l";
 export const OCCUPANCY_DISABLE_MOUSE = "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l";
 export const OCCUPANCY_FIRST_FRAME_CHROME = "Appaloft Cloud Agents";
 export const OCCUPANCY_FIRST_FRAME_TITLE = "preparing the agent";
+export const OCCUPANCY_FIRST_FRAME_SPINNER = "⠋";
+export const OCCUPANCY_FIRST_FRAME_STEPS = [
+  "Checking login",
+  "Preparing skills",
+  "Preparing disk",
+] as const;
 
 let occupancyAltScreenEntered = false;
 let occupancyAltScreenRestoreInstalled = false;
@@ -58,9 +64,35 @@ export function occupancyFirstFrameChromeForWidth(cols = 80): string {
   return fitted;
 }
 
-export function occupancyFirstFrameBytes(_rows = 24, cols = 80): string {
+export function occupancyFirstFrameWaitPanel(cols = 80): string {
+  const inner = [
+    `${OCCUPANCY_FIRST_FRAME_SPINNER} ${OCCUPANCY_FIRST_FRAME_TITLE}`,
+    "",
+    ...OCCUPANCY_FIRST_FRAME_STEPS.map((label) => `  ${label}`),
+  ];
+  const maxInner = Math.max(...inner.map((line) => line.length));
+  const innerW = Math.max(
+    8,
+    Math.min(Math.max(maxInner + 2, 22), Math.max(8, Math.floor(cols)) - 2),
+  );
+  const boxW = innerW + 2;
+  const left = " ".repeat(Math.max(0, Math.floor((Math.floor(cols) - boxW) / 2)));
+  const top = `${left}╭${"─".repeat(innerW)}╮`;
+  const bot = `${left}╰${"─".repeat(innerW)}╯`;
+  const mid = inner.map((line) => {
+    const clipped = line.length > innerW ? line.slice(0, innerW) : line;
+    return `${left}│${clipped.padEnd(innerW)}│`;
+  });
+  return [top, ...mid, bot].join("\r\n");
+}
+
+export function occupancyFirstFrameBytes(rows = 24, cols = 80): string {
   const title = occupancyFirstFrameChromeForWidth(cols);
-  return `${OCCUPANCY_ALT_SCREEN}\x1b[?25l\x1b[2J\x1b[H${title}\r\n${OCCUPANCY_FIRST_FRAME_TITLE}`;
+  const panel = occupancyFirstFrameWaitPanel(cols);
+  const panelLines = panel.split("\r\n").length;
+  const topPad = Math.max(0, Math.floor((Math.max(1, Math.floor(rows) - 1) - panelLines) / 2));
+  const padded = [title, ...Array.from({ length: topPad }, () => ""), panel].join("\r\n");
+  return `${OCCUPANCY_ALT_SCREEN}\x1b[?25l\x1b[2J\x1b[H${padded}`;
 }
 
 export function occupancyAltScreenWasEntered(): boolean {
