@@ -65,5 +65,7 @@
       first-admin -> sign-in -> Projects acceptance loop on the default bundle.
 - [x] Enable opt-in beta only after DASH-BETA rows pass.
 - [x] Enable default only after all DASH-DEFAULT rows pass.
-- [ ] Run independent Public/Private Boundary Review after public implementation and merge.
-- [ ] Record public PR/final main SHA before any downstream hosted pin/cutover.
+- [x] Run independent Public/Private Boundary Review after public implementation and merge; the
+      downstream Cloud review recorded `PASS` with no P0/P1 findings on 2026-08-25.
+- [x] Record public PR [#1433](https://github.com/appaloft/appaloft/pull/1433) and final public
+      `main` SHA `9fe2302a5c2e81768f18e5a871f8666a95f0c9a0` before downstream hosted pin/cutover.
