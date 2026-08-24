@@ -32,6 +32,7 @@ describe("Dashboard foundation", () => {
     };
     const svelteConfig = await readFile(new URL("svelte.config.js", dashboardRoot), "utf8");
     const routeLayout = await readFile(new URL("src/routes/+layout.ts", dashboardRoot), "utf8");
+    const appHtml = await readFile(new URL("src/app.html", dashboardRoot), "utf8");
 
     expect(packageJson.name).toBe("@appaloft/dashboard");
     expect(packageJson.scripts?.build).toBeTruthy();
@@ -41,6 +42,7 @@ describe("Dashboard foundation", () => {
     expect(svelteConfig).toContain("@sveltejs/adapter-static");
     expect(svelteConfig).toContain('fallback: "200.html"');
     expect(routeLayout).toContain("export const ssr = false");
+    expect(appHtml).toContain('name="application-name" content="Appaloft"');
   });
 
   test("[DASH-FOUND-001] never imports legacy apps/web source", async () => {
