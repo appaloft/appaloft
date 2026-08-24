@@ -133,6 +133,11 @@ describe("Dashboard Project summaries read model", () => {
             resourceCount: 2,
             attentionCount: 1,
             attentionStatus: "attention",
+            defaultEnvironment: {
+              id: "env_atlas",
+              name: "Production",
+              kind: "production",
+            },
             latestActivityAt: "2026-08-24T09:00:00.000Z",
           },
         ],

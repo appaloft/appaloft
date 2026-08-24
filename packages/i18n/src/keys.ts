@@ -254,6 +254,12 @@ export const i18nKeys = {
       projects: {
         title: "console:dashboard.projects.title",
         description: "console:dashboard.projects.description",
+        createTitle: "console:dashboard.projects.createTitle",
+        createDescription: "console:dashboard.projects.createDescription",
+        createError: "console:dashboard.projects.createError",
+        nameLabel: "console:dashboard.projects.nameLabel",
+        namePlaceholder: "console:dashboard.projects.namePlaceholder",
+        descriptionLabel: "console:dashboard.projects.descriptionLabel",
         healthy: "console:dashboard.projects.healthy",
         needsAttention: "console:dashboard.projects.needsAttention",
         resourceCount: "console:dashboard.projects.resourceCount",
@@ -287,7 +293,10 @@ export const i18nKeys = {
       resource: {
         description: "console:dashboard.resource.description",
         activeDeployment: "console:dashboard.resource.activeDeployment",
+        deploymentHistory: "console:dashboard.resource.deploymentHistory",
+        deploymentHistoryDescription: "console:dashboard.resource.deploymentHistoryDescription",
         deploymentSuccessful: "console:dashboard.resource.deploymentSuccessful",
+        noDeployments: "console:dashboard.resource.noDeployments",
         publicAccess: "console:dashboard.resource.publicAccess",
         runtime: "console:dashboard.resource.runtime",
         onlineReplicas: "console:dashboard.resource.onlineReplicas",

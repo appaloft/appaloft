@@ -4,7 +4,7 @@ description: "Web console 页面、表单输入、问号帮助和状态观察说
 docType: "reference"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "web"
   - "console"
@@ -15,6 +15,9 @@ searchAliases:
 relatedOperations:
   - "resources.create"
   - "deployments.create"
+  - "projects.list-summaries"
+  - "project-environments.overview"
+  - "resources.overview"
 sidebar:
   order: 7
 ---
@@ -22,6 +25,20 @@ sidebar:
 ## 标识
 
 Web 控制台是 Appaloft 的图形化入口——它只负责收集输入、显示状态并调用和 CLI/API 完全相同的 HTTP/oRPC 契约,不会在 Web 层单独实现部署规则或生命周期解释。
+
+## Dashboard Beta 导航与数据边界
+
+新的 Dashboard 使用上下文导航减少常驻菜单：Workspace 只保留 **项目、基础设施、动态、市场、设置**；进入 Project 后切换为 **概览、部署、可观测性、设置**；进入 Resource 后，详情以桌面侧板或移动全页展示。`/` 进入 `/projects`，Dashboard 路由是新的 pre-1.0 契约，不保证旧 Web 深链继续可用。
+
+Projects → Project/Environment → Resource 的 Beta 闭环使用三个有界查询：
+
+- `projects.list-summaries`：返回一页 Project 摘要，不为每个 Project 再请求 Resource 或 Deployment；
+- `project-environments.overview`：一次返回 Environment 选择、Resource 健康/访问/最近部署摘要和 cursor；
+- `resources.overview`：校验 Project/Environment/Resource owner 一致性，返回当前概览和最多五次最近部署。
+
+这些返回值是只读 observation。部署、配置、网络和运行时操作仍调用既有 Resource/Deployment command，不由 Svelte 页面自行解释或放宽。Resource 的日志、指标和其它 destination 数据只在对应页面激活后加载；关闭面板或切换 destination 后，不再保留非活动订阅。
+
+扩展继续使用 `appaloft.console.extension-page/v1` 文档。新增的 scoped navigation metadata 只把扩展放入声明的 Workspace、Project 或 Resource destination；缺少或无法识别该 metadata 的旧扩展不会被提升为新的 Workspace 常驻菜单。
 
 ## 问号帮助
 

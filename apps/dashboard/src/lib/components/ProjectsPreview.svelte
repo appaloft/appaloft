@@ -16,15 +16,31 @@
   } from "@lucide/svelte";
 
   import { dashboardClient, type DashboardProjectSummary } from "$lib/data-client";
-  import { dashboardCopy as copy, dashboardI18n as i18n } from "$lib/i18n.svelte";
+  import {
+    commonCopy,
+    dashboardCopy as copy,
+    dashboardI18n as i18n,
+  } from "$lib/i18n.svelte";
   import { projectDestinationHref, type DashboardRoute } from "$lib/navigation";
+
+  import ScopedExtensions from "./ScopedExtensions.svelte";
 
   let { route }: { route: Extract<DashboardRoute, { kind: "workspace" }> } = $props();
   let projects = $state<DashboardProjectSummary[]>([]);
   let nextCursor = $state<string | undefined>();
   let loading = $state(true);
   let error = $state(false);
+  let createOpen = $state(false);
+  let creating = $state(false);
+  let createError = $state(false);
+  let projectName = $state("");
+  let projectDescription = $state("");
   let latestRequest = 0;
+  const projectTones = [
+    { surface: "blue", classes: "bg-icon-blue text-icon-blue-foreground" },
+    { surface: "cyan", classes: "bg-icon-cyan text-icon-cyan-foreground" },
+    { surface: "violet", classes: "bg-icon-violet text-icon-violet-foreground" },
+  ] as const;
 
   async function load(): Promise<void> {
     const request = ++latestRequest;
@@ -71,6 +87,28 @@
     return `/projects?${params}`;
   }
 
+  async function createProject(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    const name = projectName.trim();
+    if (!name || creating) return;
+    creating = true;
+    createError = false;
+    try {
+      await dashboardClient.projects.create({
+        name,
+        ...(projectDescription.trim() ? { description: projectDescription.trim() } : {}),
+      });
+      projectName = "";
+      projectDescription = "";
+      createOpen = false;
+      await load();
+    } catch {
+      createError = true;
+    } finally {
+      creating = false;
+    }
+  }
+
   $effect(() => {
     route.cursor;
     route.search;
@@ -93,7 +131,7 @@
         {i18n.t(copy.projects.description)}
       </p>
     </div>
-    <Button href="/projects/new" class="h-10 rounded-[10px] px-4 shadow-[var(--shadow-primary)] hover:shadow-[var(--shadow-primary-hover)]">
+    <Button data-create-project-trigger onclick={() => (createOpen = true)} class="h-10 rounded-[10px] px-4 shadow-[var(--shadow-primary)] hover:shadow-[var(--shadow-primary-hover)]">
       <Plus data-icon="inline-start" />
       {i18n.t(copy.actions.newProject)}
     </Button>
@@ -145,11 +183,12 @@
     </section>
   {:else}
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {#each projects as project}
+      {#each projects as project, index}
+        {@const tone = projectTones[index % projectTones.length]}
         <Card.Root data-project-card class="group overflow-hidden rounded-[16px] border-divider bg-surface py-0 shadow-none transition-colors hover:border-ring/35 hover:bg-surface-raised">
-          <a class="block p-5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" href={projectDestinationHref(project.id, "overview")}>
+          <a class="block p-5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" href={projectDestinationHref(project.id, "overview", project.defaultEnvironment?.id)}>
             <div class="flex items-start justify-between gap-4">
-              <span data-icon-surface="blue" class="grid size-10 place-items-center rounded-[11px] bg-icon-blue text-icon-blue-foreground"><Boxes class="size-[18px]" /></span>
+              <span data-icon-surface={tone.surface} class={`grid size-10 place-items-center rounded-[11px] ${tone.classes}`}><Boxes class="size-[18px]" /></span>
               <ArrowUpRight class="size-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
             </div>
             <div class="mt-8">
@@ -192,4 +231,68 @@
       <Badge variant="secondary" class="ml-auto rounded-full">{i18n.t(copy.shell.live)}</Badge>
     </section>
   {/if}
+  <ScopedExtensions {route} />
 </section>
+
+{#if createOpen}
+  <div
+    class="fixed inset-0 z-50 grid place-items-center bg-background/55 p-4 backdrop-blur-sm"
+    role="presentation"
+    onclick={(event) => event.target === event.currentTarget && (createOpen = false)}
+  >
+    <div
+      class="w-full max-w-md rounded-[18px] border border-divider bg-surface-overlay p-6 shadow-[var(--shadow-overlay)]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-project-title"
+    >
+      <h2 id="create-project-title" class="text-lg font-semibold">
+        {i18n.t(copy.projects.createTitle)}
+      </h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        {i18n.t(copy.projects.createDescription)}
+      </p>
+      <form data-create-project-form class="mt-6 space-y-4" onsubmit={createProject}>
+        <label class="block text-sm font-medium">
+          {i18n.t(copy.projects.nameLabel)}
+          <input
+            class="mt-2 h-10 w-full rounded-[10px] border border-control bg-surface px-3 text-sm outline-none placeholder:text-muted-foreground/75 focus:border-ring focus:ring-2 focus:ring-ring/15"
+            bind:value={projectName}
+            name="name"
+            placeholder={i18n.t(copy.projects.namePlaceholder)}
+            autocomplete="off"
+            required
+          />
+        </label>
+        <label class="block text-sm font-medium">
+          {i18n.t(copy.projects.descriptionLabel)}
+          <textarea
+            class="mt-2 min-h-24 w-full resize-y rounded-[10px] border border-control bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/75 focus:border-ring focus:ring-2 focus:ring-ring/15"
+            bind:value={projectDescription}
+            name="description"
+          ></textarea>
+        </label>
+        {#if createError}
+          <p class="text-sm text-destructive">{i18n.t(copy.projects.createError)}</p>
+        {/if}
+        <div class="flex justify-end gap-2 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            class="h-10 rounded-[10px] shadow-none"
+            onclick={() => (createOpen = false)}
+          >
+            {i18n.t(commonCopy.actions.cancel)}
+          </Button>
+          <Button
+            type="submit"
+            class="h-10 rounded-[10px] px-4"
+            disabled={creating || !projectName.trim()}
+          >
+            {creating ? i18n.t(commonCopy.actions.creating) : i18n.t(copy.actions.newProject)}
+          </Button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}

@@ -14,3 +14,5 @@ export * from "./operations/projects/reorder-projects.handler";
 export * from "./operations/projects/restore-project.handler";
 export * from "./operations/projects/set-project-description.handler";
 export * from "./operations/projects/show-project.handler";
+export * from "./operations/project-environments/project-environment-overview.handler";
+export * from "./operations/resources/resource-overview.handler";

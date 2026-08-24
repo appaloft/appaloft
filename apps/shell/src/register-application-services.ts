@@ -298,6 +298,7 @@ import {
   ListPreviewEnvironmentsQueryService,
   ListProjectsQueryService,
   ListProjectSummariesQueryService,
+  ProjectEnvironmentOverviewQueryService,
   ListProvidersQueryService,
   ListResourceDependencyBindingsQueryHandler,
   ListResourceDependencyBindingsQueryService,
@@ -305,6 +306,7 @@ import {
   ListResourceRuntimeLogArchivesQueryService,
   ListResourceSecretReferencesQueryHandler,
   ListResourcesQueryService,
+  ResourceOverviewQueryService,
   ListRetentionDefaultsQueryHandler,
   ListRetentionDefaultsQueryService,
   ListRuntimeMonitoringSamplesQueryHandler,
@@ -2064,6 +2066,11 @@ export function registerApplicationServices(
     tokens.listProjectSummariesQueryService,
     ListProjectSummariesQueryService,
   );
+  container.registerSingleton(
+    tokens.projectEnvironmentOverviewQueryService,
+    ProjectEnvironmentOverviewQueryService,
+  );
+  container.registerSingleton(tokens.resourceOverviewQueryService, ResourceOverviewQueryService);
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
   container.registerSingleton(tokens.reorderProjectsUseCase, ReorderProjectsUseCase);
   container.registerSingleton(tokens.setProjectDescriptionUseCase, SetProjectDescriptionUseCase);

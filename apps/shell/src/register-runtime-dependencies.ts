@@ -194,6 +194,7 @@ import {
   PgProcessAttemptJournal,
   PgProjectDeletionBlockerReader,
   PgProjectReadModel,
+  PgProjectEnvironmentOverviewReadModel,
   PgProjectSummariesReadModel,
   PgProjectRepository,
   PgProviderJobLogRetentionStore,
@@ -202,6 +203,7 @@ import {
   PgResourceDependencyBindingReadModel,
   PgResourceDependencyBindingRepository,
   PgResourceHealthObservationHistoryReadModel,
+  PgResourceOverviewReadModel,
   PgResourceHealthObservationRecorder,
   PgResourceReadModel,
   PgResourceRepository,
@@ -1574,6 +1576,14 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.projectSummariesReadModel, {
     useFactory: instanceCachingFactory(() => new PgProjectSummariesReadModel(input.database.db)),
+  });
+  container.register(tokens.projectEnvironmentOverviewReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgProjectEnvironmentOverviewReadModel(input.database.db),
+    ),
+  });
+  container.register(tokens.resourceOverviewReadModel, {
+    useFactory: instanceCachingFactory(() => new PgResourceOverviewReadModel(input.database.db)),
   });
   container.register(tokens.serverReadModel, {
     useFactory: instanceCachingFactory(() => new PgServerReadModel(input.database.db)),

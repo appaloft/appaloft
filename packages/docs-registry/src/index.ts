@@ -4042,10 +4042,13 @@ export const publicDocsOperationCoverage = [
   { operationKey: "projects.list", status: "documented", topicId: "project.concept" },
   {
     operationKey: "projects.list-summaries",
-    status: "migration-gap",
-    reason:
-      "The dashboard beta query reference exists, but public bilingual task documentation is pending.",
-    targetTopicId: "project.concept",
+    status: "documented",
+    topicId: "project.concept",
+  },
+  {
+    operationKey: "project-environments.overview",
+    status: "documented",
+    topicId: "project.concept",
   },
   { operationKey: "projects.count", status: "documented", topicId: "project.concept" },
   { operationKey: "projects.show", status: "documented", topicId: "project.lifecycle" },
@@ -4325,6 +4328,11 @@ export const publicDocsOperationCoverage = [
     topicId: "server.deployment-target",
   },
   { operationKey: "resources.list", status: "documented", topicId: "resource.concept" },
+  {
+    operationKey: "resources.overview",
+    status: "documented",
+    topicId: "resource.concept",
+  },
   { operationKey: "resources.count", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.show", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.create", status: "documented", topicId: "resource.concept" },

@@ -755,6 +755,44 @@ export const systemPluginWebExtensionLocalizationSchema = z.object({
   description: z.string().min(1).optional(),
 });
 
+const systemPluginWebExtensionNavigationBaseSchema = z.object({
+  presentation: z.enum(["page", "section", "action"]),
+  key: z.string().min(1),
+  labelKey: z.string().min(1),
+  iconKey: z.string().min(1),
+  order: z.number().int(),
+  routeTemplate: z.string().min(1),
+  visibilityEndpoint: z.string().min(1).optional(),
+});
+
+export const systemPluginWebExtensionScopedNavigationSchema = z.discriminatedUnion("scope", [
+  systemPluginWebExtensionNavigationBaseSchema.extend({
+    scope: z.literal("workspace"),
+    destination: z.enum(["projects", "infrastructure", "activity", "marketplace", "settings"]),
+  }),
+  systemPluginWebExtensionNavigationBaseSchema.extend({
+    scope: z.literal("project"),
+    destination: z.enum(["overview", "deployments", "observability", "settings"]),
+  }),
+  systemPluginWebExtensionNavigationBaseSchema.extend({
+    scope: z.literal("resource"),
+    destination: z.enum([
+      "overview",
+      "deployments",
+      "configuration",
+      "logs-metrics",
+      "networking",
+      "settings",
+    ]),
+  }),
+]);
+
+export const systemPluginWebExtensionMetadataSchema = z
+  .object({
+    scopedNavigation: systemPluginWebExtensionScopedNavigationSchema.optional(),
+  })
+  .catchall(z.unknown());
+
 export const systemPluginWebExtensionSchema = z.object({
   key: z.string(),
   pluginName: z.string(),
@@ -781,7 +819,7 @@ export const systemPluginWebExtensionSchema = z.object({
   ]),
   target: z.enum(["server-page", "external-page", "console-route"]),
   requiresAuth: z.boolean(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  metadata: systemPluginWebExtensionMetadataSchema.optional(),
 });
 
 export const projectSummarySchema = z.object({
@@ -902,12 +940,148 @@ export const dashboardProjectSummarySchema = z.object({
   resourceCount: z.number().int().nonnegative(),
   attentionCount: z.number().int().nonnegative(),
   attentionStatus: z.enum(["healthy", "attention"]),
+  defaultEnvironment: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      kind: z.enum(["local", "development", "test", "staging", "production", "preview", "custom"]),
+    })
+    .optional(),
   latestActivityAt: z.string().optional(),
 });
 
 export const listProjectSummariesResponseSchema = z.object({
   items: z.array(dashboardProjectSummarySchema).max(100),
   nextCursor: z.string().optional(),
+});
+
+const dashboardResourceKindSchema = z.enum([
+  "application",
+  "service",
+  "database",
+  "cache",
+  "compose-stack",
+  "worker",
+  "static-site",
+  "external",
+]);
+
+const dashboardDeploymentStatusSchema = z.enum([
+  "created",
+  "planning",
+  "planned",
+  "running",
+  "cancel-requested",
+  "succeeded",
+  "failed",
+  "canceled",
+  "interrupted",
+  "rolled-back",
+]);
+
+const dashboardEnvironmentChoiceSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(["local", "development", "test", "staging", "production", "preview", "custom"]),
+  lifecycleStatus: z.enum(["active", "locked", "archived"]),
+});
+
+const dashboardResourceHealthSchema = z.object({
+  status: z.enum([
+    "healthy",
+    "degraded",
+    "unhealthy",
+    "starting",
+    "stopped",
+    "not-deployed",
+    "unknown",
+  ]),
+  observedAt: z.string().optional(),
+});
+
+const dashboardResourceAccessSchema = z.object({
+  status: z.enum(["ready", "not-ready", "unknown"]),
+  url: z.string().url().optional(),
+});
+
+const dashboardDeploymentSummarySchema = z.object({
+  id: z.string(),
+  status: dashboardDeploymentStatusSchema,
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  finishedAt: z.string().optional(),
+});
+
+export const projectEnvironmentOverviewResponseSchema = z.object({
+  schemaVersion: z.literal("project-environments.overview/v1"),
+  project: z.object({
+    id: z.string(),
+    name: z.string(),
+    slug: z.string(),
+    description: z.string().optional(),
+  }),
+  environment: dashboardEnvironmentChoiceSchema,
+  environmentChoices: z.array(dashboardEnvironmentChoiceSchema).max(100),
+  resources: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        slug: z.string(),
+        kind: dashboardResourceKindSchema,
+        description: z.string().optional(),
+        health: dashboardResourceHealthSchema,
+        access: dashboardResourceAccessSchema,
+        latestDeployment: dashboardDeploymentSummarySchema.optional(),
+        attentionStatus: z.enum(["healthy", "attention", "unknown"]),
+      }),
+    )
+    .max(100),
+  attention: z.object({
+    total: z.number().int().nonnegative(),
+    healthy: z.number().int().nonnegative(),
+    attention: z.number().int().nonnegative(),
+    unknown: z.number().int().nonnegative(),
+  }),
+  nextCursor: z.string().optional(),
+  generatedAt: z.string(),
+});
+
+export const resourceOverviewResponseSchema = z.object({
+  schemaVersion: z.literal("resources.overview/v1"),
+  resource: z.object({
+    id: z.string(),
+    projectId: z.string(),
+    environmentId: z.string(),
+    name: z.string(),
+    slug: z.string(),
+    kind: dashboardResourceKindSchema,
+    description: z.string().optional(),
+    lifecycleStatus: z.enum(["active", "archived"]),
+  }),
+  health: dashboardResourceHealthSchema,
+  access: dashboardResourceAccessSchema,
+  configuration: z.object({
+    sourceConfigured: z.boolean(),
+    runtimeConfigured: z.boolean(),
+    networkConfigured: z.boolean(),
+    accessConfigured: z.boolean(),
+    status: z.enum(["ready", "incomplete"]),
+  }),
+  network: z.object({
+    internalPort: z.number().int().positive().optional(),
+    protocol: z.enum(["http", "tcp"]).optional(),
+    exposureMode: z.enum(["none", "reverse-proxy", "direct-port"]).optional(),
+  }),
+  capabilities: z.object({
+    deploy: z.boolean(),
+    configure: z.boolean(),
+    logs: z.boolean(),
+    metrics: z.boolean(),
+    networking: z.boolean(),
+  }),
+  latestDeployments: z.array(dashboardDeploymentSummarySchema).max(5),
+  generatedAt: z.string(),
 });
 
 export const showProjectResponseSchema = projectSummarySchema;
@@ -8413,6 +8587,9 @@ export type SystemPluginWebExtensionIcon = z.infer<typeof systemPluginWebExtensi
 export type SystemPluginWebExtensionLocalization = z.infer<
   typeof systemPluginWebExtensionLocalizationSchema
 >;
+export type SystemPluginWebExtensionScopedNavigation = z.infer<
+  typeof systemPluginWebExtensionScopedNavigationSchema
+>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 export type MaintenanceWorkerActivation = z.infer<typeof maintenanceWorkerActivationSchema>;
 export type MaintenanceWorkerSafetyMode = z.infer<typeof maintenanceWorkerSafetyModeSchema>;
@@ -8433,6 +8610,10 @@ export type CountResponse = z.infer<typeof countResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
 export type DashboardProjectSummary = z.infer<typeof dashboardProjectSummarySchema>;
 export type ListProjectSummariesResponse = z.infer<typeof listProjectSummariesResponseSchema>;
+export type ProjectEnvironmentOverviewResponse = z.infer<
+  typeof projectEnvironmentOverviewResponseSchema
+>;
+export type ResourceOverviewResponse = z.infer<typeof resourceOverviewResponseSchema>;
 export type ShowProjectResponse = z.infer<typeof showProjectResponseSchema>;
 export type RenameProjectResponse = z.infer<typeof renameProjectResponseSchema>;
 export type ReorderProjectsResponse = z.infer<typeof reorderProjectsResponseSchema>;

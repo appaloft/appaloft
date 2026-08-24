@@ -11,3 +11,5 @@ export * from "./operations/projects/reorder-projects.command";
 export * from "./operations/projects/restore-project.command";
 export * from "./operations/projects/set-project-description.command";
 export * from "./operations/projects/show-project.query";
+export * from "./operations/project-environments/project-environment-overview.query";
+export * from "./operations/resources/resource-overview.query";

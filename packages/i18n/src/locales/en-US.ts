@@ -257,6 +257,12 @@ export const enUS = {
         title: "Projects",
         description:
           "Your deployable systems, with attention and activity kept close to the owner.",
+        createTitle: "Create a project",
+        createDescription: "Start a new owner boundary for environments and resources.",
+        createError: "The project could not be created. Check the name and try again.",
+        nameLabel: "Project name",
+        namePlaceholder: "e.g. Customer API",
+        descriptionLabel: "Description (optional)",
         healthy: "Healthy",
         needsAttention: "Needs attention",
         resourceCount: "{{count}} resources",
@@ -290,7 +296,10 @@ export const enUS = {
       resource: {
         description: "Runtime state and deployment context stay owned by this resource.",
         activeDeployment: "Active deployment",
+        deploymentHistory: "Deployment history",
+        deploymentHistoryDescription: "The five latest deployments for this resource.",
         deploymentSuccessful: "Deployment successful",
+        noDeployments: "No deployments yet",
         publicAccess: "Public access",
         runtime: "Runtime",
         onlineReplicas: "Online · {{count}} replica",

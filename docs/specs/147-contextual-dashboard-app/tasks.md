@@ -37,16 +37,16 @@
 
 - [x] Add `projects.list-summaries` spec/catalog/query/transport/tests and real Dashboard Projects
       loading/search/sort/cursor states in the first #1424 tracer slice.
-- [ ] Add `project-environments.overview` spec/catalog/query/transport/tests.
-- [ ] Add `resources.overview` spec/catalog/query/transport/tests.
-- [ ] Add scoped extension navigation metadata while preserving the v1 page renderer.
-- [ ] Update Business Operation Map, Core Operations, docs registry, and generated interface parity.
+- [x] Add `project-environments.overview` spec/catalog/query/transport/tests.
+- [x] Add `resources.overview` spec/catalog/query/transport/tests.
+- [x] Add scoped extension navigation metadata while preserving the v1 page renderer.
+- [x] Update Business Operation Map, Core Operations, docs registry, and generated interface parity.
 
 ## Vertical Slices
 
-- [ ] Projects Workspace list and creation/open path.
-- [ ] Project Overview/List, Environment URL context, and Resource selection.
-- [ ] Resource Overview/Deployments route-backed panel/full page.
+- [x] Projects Workspace list and creation/open path.
+- [x] Project Overview/List, Environment URL context, and Resource selection.
+- [x] Resource Overview/Deployments route-backed panel/full page.
 - [ ] Resource Configuration, Logs & Metrics, Networking, and Settings.
 - [ ] Infrastructure and Activity.
 - [ ] Marketplace and Settings.
@@ -58,7 +58,7 @@
 
 - [x] Record luminous-surface refinement PR #1431 and public `main` SHA
       `0dfe728286a5cedcf08c6d49d027f146f5574c9d` before the downstream hosted pin sync.
-- [ ] Existing-anchor Docs Round: update both `reference/web-console` locales and docs registry.
+- [x] Existing-anchor Docs Round: update both `reference/web-console` locales and docs registry.
 - [ ] Add breaking-route release note; do not add redirect promises.
 - [ ] Enable opt-in beta only after DASH-BETA rows pass.
 - [ ] Enable default only after all DASH-DEFAULT rows pass.

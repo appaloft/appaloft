@@ -262,6 +262,12 @@ export const zhCN = {
       projects: {
         title: "项目",
         description: "围绕项目本身呈现可部署系统、待处理事项和最近动态。",
+        createTitle: "创建项目",
+        createDescription: "为环境与资源创建一个新的归属边界。",
+        createError: "无法创建项目，请检查名称后重试。",
+        nameLabel: "项目名称",
+        namePlaceholder: "例如：客户 API",
+        descriptionLabel: "描述（可选）",
         healthy: "健康",
         needsAttention: "需要关注",
         resourceCount: "{{count}} 个资源",
@@ -295,7 +301,10 @@ export const zhCN = {
       resource: {
         description: "运行状态与部署上下文始终归属于当前资源。",
         activeDeployment: "当前部署",
+        deploymentHistory: "部署历史",
+        deploymentHistoryDescription: "当前资源最近的五次部署。",
         deploymentSuccessful: "部署成功",
+        noDeployments: "暂无部署",
         publicAccess: "公开访问",
         runtime: "运行时",
         onlineReplicas: "在线 · {{count}} 个副本",

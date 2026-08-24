@@ -19,6 +19,9 @@ interface ProjectSummaryRow {
   description: string | null;
   resource_count: number | string;
   attention_count: number | string;
+  default_environment_id: string | null;
+  default_environment_name: string | null;
+  default_environment_kind: string | null;
   latest_activity_at: string;
 }
 
@@ -54,6 +57,27 @@ export class PgProjectSummariesReadModel implements ProjectSummariesReadModel {
         p.name,
         p.slug,
         p.description,
+        (
+          select e.id
+          from environments e
+          where e.project_id = p.id and e.lifecycle_status = 'active'
+          order by case when e.kind = 'production' then 0 else 1 end, e.created_at asc, e.id asc
+          limit 1
+        ) as default_environment_id,
+        (
+          select e.name
+          from environments e
+          where e.project_id = p.id and e.lifecycle_status = 'active'
+          order by case when e.kind = 'production' then 0 else 1 end, e.created_at asc, e.id asc
+          limit 1
+        ) as default_environment_name,
+        (
+          select e.kind
+          from environments e
+          where e.project_id = p.id and e.lifecycle_status = 'active'
+          order by case when e.kind = 'production' then 0 else 1 end, e.created_at asc, e.id asc
+          limit 1
+        ) as default_environment_kind,
         (
           select count(*)
           from resources r
@@ -110,6 +134,19 @@ export class PgProjectSummariesReadModel implements ProjectSummariesReadModel {
           resourceCount: Number(row.resource_count),
           attentionCount,
           attentionStatus: attentionCount > 0 ? "attention" : "healthy",
+          ...(row.default_environment_id &&
+          row.default_environment_name &&
+          row.default_environment_kind
+            ? {
+                defaultEnvironment: {
+                  id: row.default_environment_id,
+                  name: row.default_environment_name,
+                  kind: row.default_environment_kind as NonNullable<
+                    DashboardProjectSummary["defaultEnvironment"]
+                  >["kind"],
+                },
+              }
+            : {}),
           latestActivityAt: normalizeTimestamp(row.latest_activity_at) ?? row.latest_activity_at,
         };
       }),

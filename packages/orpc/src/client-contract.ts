@@ -140,9 +140,11 @@ import {
   type ListPreviewEnvironmentsQueryInput,
   type ListProjectsQueryInput,
   type ListProjectSummariesQueryInput,
+  type ProjectEnvironmentOverviewQueryInput,
   type ListResourceDependencyBindingsQueryInput,
   type ListResourceSecretReferencesQueryInput,
   type ListResourcesQueryInput,
+  type ResourceOverviewQueryInput,
   type ListRuntimeMonitoringSamplesQueryInput,
   type ListScheduledTaskRunsQueryInput,
   type ListScheduledTasksQueryInput,
@@ -406,10 +408,12 @@ import {
   type ListPreviewEnvironmentsResponse,
   type ListProjectsResponse,
   type ListProjectSummariesResponse,
+  type ProjectEnvironmentOverviewResponse,
   type ListProvidersResponse,
   type ListResourceDependencyBindingsResponse,
   type ListResourceSecretReferencesResponse,
   type ListResourcesResponse,
+  type ResourceOverviewResponse,
   type ListScheduledRuntimePrunePoliciesResponse,
   type ListScheduledTaskRunsResponse,
   type ListScheduledTasksResponse,
@@ -1371,6 +1375,12 @@ export type AppaloftOrpcClientContract = {
       ListProjectSummariesResponse,
       AppaloftClientError
     >;
+    environmentOverview: Client<
+      AppaloftClientContext,
+      ProjectEnvironmentOverviewQueryInput,
+      ProjectEnvironmentOverviewResponse,
+      AppaloftClientError
+    >;
     create: Client<
       AppaloftClientContext,
       CreateProjectCommandInput,
@@ -1767,6 +1777,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowResourceQueryInput,
       ResourceDetail,
+      AppaloftClientError
+    >;
+    overview: Client<
+      AppaloftClientContext,
+      ResourceOverviewQueryInput,
+      ResourceOverviewResponse,
       AppaloftClientError
     >;
     create: Client<

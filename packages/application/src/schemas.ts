@@ -133,11 +133,19 @@ export * from "./operations/environments/set-environment-variable.schema";
 export * from "./operations/environments/show-environment.schema";
 export * from "./operations/environments/unlock-environment.schema";
 export * from "./operations/environments/unset-environment-variable.schema";
+export {
+  type ProjectEnvironmentOverviewQueryInput,
+  projectEnvironmentOverviewQueryInputSchema,
+} from "./operations/project-environments/project-environment-overview.query";
 export * from "./operations/operator-work/list-operator-work.schema";
 export * from "./operations/operator-work/prune-operator-work.schema";
 export * from "./operations/operator-work/retry-operator-work.schema";
 export * from "./operations/operator-work/show-operator-work.schema";
 export * from "./operations/operator-work/stream-operator-work-events.schema";
+export {
+  type ResourceOverviewQueryInput,
+  resourceOverviewQueryInputSchema,
+} from "./operations/resources/resource-overview.query";
 export {
   type ChangeOrganizationMemberRoleCommandInput,
   changeOrganizationMemberRoleCommandInputSchema,

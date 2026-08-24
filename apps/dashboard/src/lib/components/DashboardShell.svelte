@@ -26,6 +26,7 @@
     type ProjectDestination,
     type WorkspaceDestination,
   } from "$lib/navigation";
+  import { dashboardProjectContext } from "$lib/project-context.svelte";
   import { dashboardTheme } from "$lib/theme.svelte";
 
   import ProjectPreview from "./ProjectPreview.svelte";
@@ -74,12 +75,12 @@
         <span class="hidden text-muted-foreground/50 sm:block">/</span>
         <button class="inline-flex min-w-0 items-center gap-2 rounded-[9px] px-2 py-1.5 text-sm font-medium hover:bg-muted">
           <span class="size-2 shrink-0 rounded-full bg-primary"></span>
-          <span class="truncate">Atlas API</span>
+          <span class="truncate">{dashboardProjectContext.projectId === projectId ? dashboardProjectContext.projectName : projectId}</span>
           <ChevronDown class="size-3.5 shrink-0 text-muted-foreground" />
         </button>
         <span class="text-muted-foreground/50">/</span>
         <button class="hidden items-center gap-1.5 rounded-[9px] px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted sm:inline-flex">
-          {environmentId}
+          {dashboardProjectContext.projectId === projectId && dashboardProjectContext.environmentId === environmentId ? dashboardProjectContext.environmentName : environmentId}
           <ChevronDown class="size-3.5" />
         </button>
       {:else}
@@ -130,7 +131,7 @@
         </a>
         <div class="mb-3 border-b border-sidebar-border px-3 pb-4">
           <p class="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{i18n.t(copy.shell.projectScope)}</p>
-          <p class="mt-1 truncate text-sm font-semibold text-sidebar-foreground">Atlas API</p>
+          <p class="mt-1 truncate text-sm font-semibold text-sidebar-foreground">{dashboardProjectContext.projectId === projectId ? dashboardProjectContext.projectName : projectId}</p>
         </div>
         <nav class="space-y-1" aria-label="Project">
           {#each projectNavigation as item}
