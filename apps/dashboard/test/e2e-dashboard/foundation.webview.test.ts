@@ -66,6 +66,7 @@ async function navigateWithTheme(
     () => view.evaluate<string | undefined>(`document.documentElement.dataset.theme`),
     (value) => value === theme,
   );
+  await Bun.sleep(300);
 }
 
 async function capture(view: Bun.WebView, name: string): Promise<string> {
@@ -107,11 +108,15 @@ describe("Dashboard foundation WebView", () => {
     await navigateWithTheme(view, "/projects", "light");
 
     const light = await view.evaluate<{
+      ambientBackground: string;
+      iconSurfaceCount: number;
       navLabels: string[];
       preset: string | undefined;
       theme: string | undefined;
       unlabeledControls: number;
     }>(`(() => ({
+      ambientBackground: getComputedStyle(document.querySelector('.dashboard-shell')).backgroundImage,
+      iconSurfaceCount: document.querySelectorAll('[data-icon-surface]').length,
       navLabels: Array.from(document.querySelectorAll('nav[aria-label="Workspace"] a')).filter((item) => item.getClientRects().length > 0).map((item) => item.textContent?.trim() ?? ''),
       preset: document.documentElement.dataset.consolePreset,
       theme: document.documentElement.dataset.theme,
@@ -120,10 +125,30 @@ describe("Dashboard foundation WebView", () => {
 
     expect(light.preset).toBe("dashboard-v2");
     expect(light.theme).toBe("light");
+    expect(light.ambientBackground).toContain("radial-gradient");
+    expect(light.iconSurfaceCount).toBeGreaterThanOrEqual(3);
     expect(light.navLabels).toHaveLength(5);
     expect(light.unlabeledControls).toBe(0);
     expect(
       (await Bun.file(await capture(view, "projects-desktop-light")).arrayBuffer()).byteLength,
+    ).toBeGreaterThan(10_000);
+
+    await navigateWithTheme(
+      view,
+      "/projects/atlas-api/overview?environment=production&view=list",
+      "light",
+    );
+    expect(
+      (await Bun.file(await capture(view, "project-desktop-light")).arrayBuffer()).byteLength,
+    ).toBeGreaterThan(10_000);
+
+    await navigateWithTheme(
+      view,
+      "/projects/atlas-api/resources/api-gateway/overview?environment=production&view=list",
+      "dark",
+    );
+    expect(
+      (await Bun.file(await capture(view, "resource-desktop-dark")).arrayBuffer()).byteLength,
     ).toBeGreaterThan(10_000);
 
     await navigateWithTheme(view, "/patterns", "dark");
@@ -141,23 +166,37 @@ describe("Dashboard foundation WebView", () => {
 
     const workspace = await view.evaluate<{
       bottomLabels: string[];
+      cardBackground: string;
+      cardSurfaceToken: string;
       clientWidth: number;
+      rootClass: string;
       scrollWidth: number;
+      surfaceToken: string;
     }>(`(() => ({
       bottomLabels: Array.from(document.querySelectorAll('nav[aria-label="Workspace"] a')).filter((item) => item.getClientRects().length > 0).map((item) => item.textContent?.trim() ?? ''),
+      cardBackground: getComputedStyle(document.querySelector('[data-project-card]')).backgroundColor,
+      cardSurfaceToken: getComputedStyle(document.querySelector('[data-project-card]')).getPropertyValue('--surface').trim(),
       clientWidth: document.documentElement.clientWidth,
+      rootClass: document.documentElement.className,
       scrollWidth: document.documentElement.scrollWidth,
+      surfaceToken: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim(),
     }))()`);
 
     expect(workspace.bottomLabels).toHaveLength(5);
     expect(workspace.bottomLabels.every(Boolean)).toBe(true);
+    expect(workspace.rootClass.split(/\s+/)).toContain("dark");
+    expect(workspace.surfaceToken).toBe("#282a37");
+    expect(workspace.cardSurfaceToken).toBe("#282a37");
+    expect(workspace.cardBackground).toBe("rgb(40, 42, 55)");
     expect(workspace.scrollWidth).toBeLessThanOrEqual(workspace.clientWidth);
     expect(
       (await Bun.file(await capture(view, "projects-mobile-dark")).arrayBuffer()).byteLength,
     ).toBeGreaterThan(10_000);
 
-    await view.navigate(
-      `${previewUrl}/projects/atlas-api/resources/api-gateway/deployments?environment=production&view=logs`,
+    await navigateWithTheme(
+      view,
+      "/projects/atlas-api/resources/api-gateway/deployments?environment=production&view=logs",
+      "dark",
     );
     const resource = await view.evaluate<{
       backgroundDisplay: string;

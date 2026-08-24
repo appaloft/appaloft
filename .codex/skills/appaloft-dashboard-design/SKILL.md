@@ -44,9 +44,13 @@ If these disagree, stop and sync the higher-authority artifact before inventing 
   Healthy, warning, and failure colors communicate real status and always include a label or icon.
 - Ordinary surfaces use fill, border, and spacing without shadow. Only overlays and route-backed
   panels use `--shadow-overlay`.
-- Light uses a near-white neutral canvas. Dark must be complete warm charcoal, not navy chrome or a
-  partial token inversion. Do not add gradients, black primary actions, ornamental glass, or pills
+- Light uses a near-white luminous canvas. Dark must be complete lifted warm charcoal, not near-black
+  navy chrome or a partial token inversion. Restrained radial ambient light may use only the public
+  blue/cyan/violet ambient tokens at shell level; content cards stay solid. Do not add dominant
+  linear gradients, glow to every card/text/CTA, black primary actions, ornamental glass, or pills
   for ordinary navigation.
+- Repeated object icons may use the public pastel blue/cyan/violet icon-surface pairs. These roles
+  are decorative identity only and must never replace labeled success, warning, or failure state.
 - All product copy goes through `@appaloft/i18n`; mono is reserved for ids, commands, ports, logs,
   and other machine values.
 

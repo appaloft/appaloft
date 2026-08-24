@@ -59,10 +59,10 @@
   }
 </script>
 
-<div class="min-h-svh bg-background text-foreground">
-  <header class="fixed inset-x-0 top-0 z-30 flex h-16 items-center border-b border-divider bg-background/95 px-4 backdrop-blur-md sm:px-5">
+<div class="dashboard-shell min-h-svh text-foreground">
+  <header class="fixed inset-x-0 top-0 z-30 flex h-16 items-center border-b border-divider bg-surface-raised/90 px-4 backdrop-blur-md sm:px-5">
     <div class="flex min-w-0 flex-1 items-center gap-3">
-      <a class="grid size-9 shrink-0 place-items-center rounded-[11px] bg-foreground text-background" href="/projects" aria-label="Appaloft">
+      <a class="grid size-9 shrink-0 place-items-center rounded-[11px] bg-primary text-primary-foreground shadow-[var(--shadow-primary)]" href="/projects" aria-label="Appaloft">
         <span class="text-[15px] font-semibold">A</span>
       </a>
       <span class="hidden h-6 w-px bg-divider sm:block"></span>
@@ -161,7 +161,7 @@
             </a>
           {/each}
         </nav>
-        <div class="mt-auto rounded-[12px] border border-sidebar-border bg-background/60 p-3">
+        <div class="mt-auto rounded-[12px] border border-sidebar-border bg-surface/75 p-3">
           <div class="flex items-center gap-2 text-xs font-medium">
             <span class="size-2 rounded-full bg-emerald-500"></span>
             {i18n.t(copy.shell.allSystemsOperational)}
@@ -215,7 +215,7 @@
   {/if}
 
   {#if !projectScoped}
-    <nav class="fixed inset-x-0 bottom-0 z-30 grid h-[68px] grid-cols-5 border-t border-divider bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden" aria-label="Workspace">
+    <nav class="fixed inset-x-0 bottom-0 z-30 grid h-[68px] grid-cols-5 border-t border-divider bg-surface-raised/90 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden" aria-label="Workspace">
       {#each workspaceNavigation as item}
         {@const active = route.kind === "workspace" && route.destination === item.id}
         <a class={`flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-medium ${active ? "text-primary" : "text-muted-foreground"}`} href={item.href} aria-current={active ? "page" : undefined}>

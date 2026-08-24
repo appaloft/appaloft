@@ -30,7 +30,14 @@ describe("dashboard-v2 design governance", () => {
       ["--radius: 0.625rem", "10px control radius"],
       ["--radius-card: 1rem", "14-16px card radius"],
       ["--radius-panel: 1.125rem", "16-18px panel radius"],
-      ["--background: #181716", "warm-charcoal Dark"],
+      ["--background: #fbfcff", "near-white luminous Light"],
+      ["--background: #20212c", "lifted warm-charcoal Dark"],
+      ["--ambient-blue:", "--ambient-blue"],
+      ["--ambient-cyan:", "--ambient-cyan"],
+      ["--ambient-violet:", "--ambient-violet"],
+      ["--icon-blue:", "--icon-blue"],
+      ["--icon-cyan:", "--icon-cyan"],
+      ["--icon-violet:", "--icon-violet"],
     ] as const;
 
     for (const [token, documentation] of contract) {
@@ -47,6 +54,20 @@ describe("dashboard-v2 design governance", () => {
     expect(source).not.toMatch(/\b(?:railway|openship|kun)\b/i);
     expect(source).not.toMatch(/(?:bg|from|via|to)-gradient/);
     expect(source).toContain("@appaloft/design/styles/dashboard.css");
+  });
+
+  test("[DASH-VIS-005] keeps luminous depth shell-scoped and semantic", async () => {
+    const css = await readFile(
+      new URL("../../../packages/design/styles/dashboard.css", import.meta.url),
+      "utf8",
+    );
+    const source = await readTree(new URL("../src/", import.meta.url));
+
+    expect(css).toContain(".dashboard-shell");
+    expect(css).toContain("radial-gradient(");
+    expect(css).not.toContain("linear-gradient(");
+    expect(source).toContain("data-icon-surface");
+    expect(source).not.toMatch(/(?:bg|text)-(?:blue|cyan|violet|purple)-[1-9]00/);
   });
 
   test("[DASH-A11Y-005] keeps a reduced-motion fallback in the dashboard preset", async () => {

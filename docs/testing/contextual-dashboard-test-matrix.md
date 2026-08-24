@@ -54,16 +54,17 @@ rules. Legacy route parity is deliberately absent.
 
 ## Visual, Accessibility, And Responsive Matrix
 
-| Test ID       | Layer            | Given / When                                                 | Then                                                                                                                                     |
-| ------------- | ---------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| DASH-VIS-001  | source           | Dashboard styles are checked                                 | Only approved semantic tokens/utilities are used; raw competitor assets/tokens and private theme overrides fail lint.                    |
-| DASH-VIS-002  | source           | DESIGN and token sources drift                               | CI fails with the mismatched role/value/version.                                                                                         |
-| DASH-VIS-003  | visual           | pattern gallery and core routes render                       | Light and warm-charcoal Dark screenshots pass at desktop and mobile widths.                                                              |
-| DASH-VIS-004  | visual           | empty/loading/error/selected/focus/destructive states render | Every state follows v2 surface/radius/elevation/status roles.                                                                            |
-| DASH-A11Y-005 | browser          | keyboard-only navigation                                     | Context switcher, five Workspace destinations, Project drawer, Resource tabs, panel close, and actions are reachable with visible focus. |
-| DASH-A11Y-006 | browser          | keyboard resizing                                            | Resize handle has an accessible name, min/max bounds, and arrow-key controls.                                                            |
-| DASH-A11Y-007 | browser          | reduced motion is requested                                  | Nonessential motion is removed and state remains understandable.                                                                         |
-| DASH-A11Y-008 | automated/manual | color contrast is audited                                    | Text/control/status meet WCAG 2.2 AA and status is not hue-only.                                                                         |
+| Test ID       | Layer            | Given / When                                                 | Then                                                                                                                                                      |
+| ------------- | ---------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DASH-VIS-001  | source           | Dashboard styles are checked                                 | Only approved semantic tokens/utilities are used; raw competitor assets/tokens and private theme overrides fail lint.                                     |
+| DASH-VIS-002  | source           | DESIGN and token sources drift                               | CI fails with the mismatched role/value/version.                                                                                                          |
+| DASH-VIS-003  | visual           | pattern gallery and core routes render                       | Light and warm-charcoal Dark screenshots pass at desktop and mobile widths.                                                                               |
+| DASH-VIS-004  | visual           | empty/loading/error/selected/focus/destructive states render | Every state follows v2 surface/radius/elevation/status roles.                                                                                             |
+| DASH-VIS-005  | source/visual    | Dashboard luminous hierarchy renders                         | Light is near-white, Dark is lifted charcoal, ambient light stays shell-scoped, icon wells use approved roles, and primary/status semantics do not drift. |
+| DASH-A11Y-005 | browser          | keyboard-only navigation                                     | Context switcher, five Workspace destinations, Project drawer, Resource tabs, panel close, and actions are reachable with visible focus.                  |
+| DASH-A11Y-006 | browser          | keyboard resizing                                            | Resize handle has an accessible name, min/max bounds, and arrow-key controls.                                                                             |
+| DASH-A11Y-007 | browser          | reduced motion is requested                                  | Nonessential motion is removed and state remains understandable.                                                                                          |
+| DASH-A11Y-008 | automated/manual | color contrast is audited                                    | Text/control/status meet WCAG 2.2 AA and status is not hue-only.                                                                                          |
 
 ## Performance Matrix
 

@@ -17,6 +17,8 @@
 - [x] Workspace/Project breadth: [#1426](https://github.com/appaloft/appaloft/issues/1426), `ready-for-agent`.
 - [x] Benchmark-gated Topology: [#1427](https://github.com/appaloft/appaloft/issues/1427), `ready-for-agent`.
 - [x] Public default cutover: [#1428](https://github.com/appaloft/appaloft/issues/1428), `ready-for-agent`.
+- [x] Luminous surface refinement: [#1430](https://github.com/appaloft/appaloft/issues/1430),
+      `ready-for-agent`.
 
 ## Foundation
 
@@ -27,6 +29,8 @@
 - [x] Add `apps/dashboard` workspace, static build, local command, and selectable bundle seam.
 - [x] Add `dashboard-v2` tokens and keep `legacy-console-v1` isolated to `apps/web`.
 - [x] Add Dashboard design skill, lint, token/DESIGN drift check, pattern gallery, and visual tests.
+- [x] Refine Dashboard v2 with brighter semantic surfaces, restrained ambient light, pastel icon
+      surfaces, and lifted Dark under DASH-VIS-005.
 - [x] Add route-state, responsive shell, accessibility, and performance harnesses.
 
 ## Public Contracts

@@ -15,7 +15,8 @@
       status: "healthy",
       resources: 6,
       activity: "8 min ago",
-      accent: "bg-primary",
+      accent: "bg-icon-blue text-icon-blue-foreground",
+      tone: "blue",
     },
     {
       id: "northstar-web",
@@ -24,7 +25,8 @@
       status: "attention",
       resources: 4,
       activity: "23 min ago",
-      accent: "bg-chart-2",
+      accent: "bg-icon-cyan text-icon-cyan-foreground",
+      tone: "cyan",
     },
     {
       id: "ledger-sync",
@@ -33,7 +35,8 @@
       status: "healthy",
       resources: 3,
       activity: "2 hr ago",
-      accent: "bg-chart-4",
+      accent: "bg-icon-violet text-icon-violet-foreground",
+      tone: "violet",
     },
   ] as const;
 </script>
@@ -52,8 +55,8 @@
         {i18n.t(copy.projects.description)}
       </p>
     </div>
-    <Button class="h-10 rounded-[10px] px-4 shadow-none">
-      <Plus class="size-4" />
+    <Button class="h-10 rounded-[10px] px-4 shadow-[var(--shadow-primary)] hover:shadow-[var(--shadow-primary-hover)]">
+      <Plus data-icon="inline-start" />
       {i18n.t(copy.actions.newProject)}
     </Button>
   </div>
@@ -71,13 +74,13 @@
 
   <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
     {#each projects as project}
-      <Card.Root class="group overflow-hidden rounded-[16px] border-divider bg-surface py-0 shadow-none transition-colors hover:border-ring/35">
+      <Card.Root data-project-card class="group overflow-hidden rounded-[16px] border-divider bg-surface py-0 shadow-none transition-colors hover:border-ring/35 hover:bg-surface-raised">
         <a
           class="block p-5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           href={projectDestinationHref(project.id, "overview")}
         >
           <div class="flex items-start justify-between gap-4">
-            <span class={`grid size-10 place-items-center rounded-[11px] text-white ${project.accent}`}>
+            <span data-icon-surface={project.tone} class={`grid size-10 place-items-center rounded-[11px] ${project.accent}`}>
               <Boxes class="size-[18px]" />
             </span>
             <ArrowUpRight class="size-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />

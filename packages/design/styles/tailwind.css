@@ -20,6 +20,12 @@
   --color-ring: var(--ring);
   --color-control: var(--control);
   --color-divider: var(--divider);
+  --color-icon-violet-foreground: var(--icon-violet-foreground);
+  --color-icon-violet: var(--icon-violet);
+  --color-icon-cyan-foreground: var(--icon-cyan-foreground);
+  --color-icon-cyan: var(--icon-cyan);
+  --color-icon-blue-foreground: var(--icon-blue-foreground);
+  --color-icon-blue: var(--icon-blue);
   --color-surface-selected: var(--surface-selected);
   --color-surface-overlay: var(--surface-overlay);
   --color-surface-raised: var(--surface-raised);
