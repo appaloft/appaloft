@@ -422,6 +422,7 @@ import {
   ListPluginsQuery,
   ListPreviewEnvironmentsQuery,
   ListProjectsQuery,
+  ListProjectSummariesQuery,
   ListProvidersQuery,
   ListRepositoryBindingsQuery,
   ListResourceDependencyBindingsQuery,
@@ -495,6 +496,7 @@ import {
   listOrganizationMembersQueryInputSchema,
   listPreviewEnvironmentsQueryInputSchema,
   listProjectsQueryInputSchema,
+  listProjectSummariesQueryInputSchema,
   listRepositoryBindingsInputSchema,
   listRepositoryBindingsResponseSchema,
   listResourceDependencyBindingsQueryInputSchema,
@@ -1064,6 +1066,7 @@ import {
   listPluginsResponseSchema,
   listPreviewEnvironmentsResponseSchema,
   listProjectsResponseSchema,
+  listProjectSummariesResponseSchema,
   listProvidersResponseSchema,
   listResourceDependencyBindingsResponseSchema,
   listResourceRuntimeLogArchivesResponseSchema,
@@ -3723,6 +3726,18 @@ export const listProjectsProcedure = base
   .input(listProjectsQueryInputSchema)
   .output(listProjectsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListProjectsQuery.create(input)));
+
+export const listProjectSummariesProcedure = base
+  .route({
+    method: "GET",
+    path: "/projects/summaries",
+    successStatus: 200,
+  })
+  .input(listProjectSummariesQueryInputSchema)
+  .output(listProjectSummariesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListProjectSummariesQuery.create(input)),
+  );
 
 export const countProjectsProcedure = base
   .route({
@@ -9006,6 +9021,7 @@ export const appaloftOrpcRouter = {
   projects: {
     count: countProjectsProcedure,
     list: listProjectsProcedure,
+    listSummaries: listProjectSummariesProcedure,
     create: createProjectProcedure,
     show: showProjectProcedure,
     rename: renameProjectProcedure,
@@ -11171,10 +11187,10 @@ function hasPartialTrustedDeploymentContext(
 ): boolean {
   const hasAnyDeploymentId = Boolean(
     trustedContext?.projectId ||
-      trustedContext?.environmentId ||
-      trustedContext?.resourceId ||
-      trustedContext?.serverId ||
-      trustedContext?.destinationId,
+    trustedContext?.environmentId ||
+    trustedContext?.resourceId ||
+    trustedContext?.serverId ||
+    trustedContext?.destinationId,
   );
   if (!hasAnyDeploymentId) {
     return false;

@@ -8,6 +8,7 @@ export * from "./operations/projects/count-projects.query-service";
 export * from "./operations/projects/create-project.handler";
 export * from "./operations/projects/delete-project.handler";
 export * from "./operations/projects/list-projects.handler";
+export * from "./operations/projects/list-project-summaries.handler";
 export * from "./operations/projects/rename-project.handler";
 export * from "./operations/projects/reorder-projects.handler";
 export * from "./operations/projects/restore-project.handler";

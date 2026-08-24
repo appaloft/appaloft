@@ -297,6 +297,7 @@ import {
   ListPreviewEnvironmentsQueryHandler,
   ListPreviewEnvironmentsQueryService,
   ListProjectsQueryService,
+  ListProjectSummariesQueryService,
   ListProvidersQueryService,
   ListResourceDependencyBindingsQueryHandler,
   ListResourceDependencyBindingsQueryService,
@@ -1104,9 +1105,7 @@ function redisLogicalBackupError(
   );
 }
 
-export class BunDependencyResourceNativeCommandRunner
-  implements ShellDependencyResourceNativeCommandRunner
-{
+export class BunDependencyResourceNativeCommandRunner implements ShellDependencyResourceNativeCommandRunner {
   async run(input: ShellDependencyResourceNativeCommandInput): Promise<Result<void, DomainError>> {
     if (input.operation === "redis-backup") {
       return await this.runRedisBackup(input);
@@ -2061,6 +2060,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.countProjectsQueryService, CountProjectsQueryService);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
+  container.registerSingleton(
+    tokens.listProjectSummariesQueryService,
+    ListProjectSummariesQueryService,
+  );
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
   container.registerSingleton(tokens.reorderProjectsUseCase, ReorderProjectsUseCase);
   container.registerSingleton(tokens.setProjectDescriptionUseCase, SetProjectDescriptionUseCase);

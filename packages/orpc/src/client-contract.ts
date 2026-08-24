@@ -139,6 +139,7 @@ import {
   type ListOrganizationMembersQueryInput,
   type ListPreviewEnvironmentsQueryInput,
   type ListProjectsQueryInput,
+  type ListProjectSummariesQueryInput,
   type ListResourceDependencyBindingsQueryInput,
   type ListResourceSecretReferencesQueryInput,
   type ListResourcesQueryInput,
@@ -404,6 +405,7 @@ import {
   type ListPluginsResponse,
   type ListPreviewEnvironmentsResponse,
   type ListProjectsResponse,
+  type ListProjectSummariesResponse,
   type ListProvidersResponse,
   type ListResourceDependencyBindingsResponse,
   type ListResourceSecretReferencesResponse,
@@ -1361,6 +1363,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ListProjectsQueryInput,
       ListProjectsResponse,
+      AppaloftClientError
+    >;
+    listSummaries: Client<
+      AppaloftClientContext,
+      ListProjectSummariesQueryInput,
+      ListProjectSummariesResponse,
       AppaloftClientError
     >;
     create: Client<

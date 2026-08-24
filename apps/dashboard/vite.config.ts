@@ -1,5 +1,6 @@
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
+import { resolve } from "node:path";
 import { defineConfig, loadEnv } from "vite";
 
 function dashboardPort(mode: string): number {
@@ -10,6 +11,9 @@ function dashboardPort(mode: string): number {
 export default defineConfig(({ mode }) => ({
   plugins: [tailwindcss(), sveltekit()],
   server: {
+    fs: {
+      allow: [resolve(process.cwd(), "../../../..")],
+    },
     port: dashboardPort(mode),
     proxy: {
       "/api": {

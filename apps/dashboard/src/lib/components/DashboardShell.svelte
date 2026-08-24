@@ -175,7 +175,7 @@
       class={`min-w-0 flex-1 pb-20 lg:ml-[248px] lg:pb-0 ${route.kind === "resource" ? "dashboard-resource-background" : ""}`}
     >
       {#if route.kind === "workspace" && route.destination === "projects"}
-        <ProjectsPreview />
+        <ProjectsPreview {route} />
       {:else if route.kind === "workspace" && route.destination !== "projects"}
         <WorkspaceDestinationPreview destination={route.destination} />
       {:else if route.kind === "project" || route.kind === "resource"}

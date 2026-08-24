@@ -215,6 +215,7 @@ import {
   PgProcessAttemptJournal,
   PgProjectDeletionBlockerReader,
   PgProjectReadModel,
+  PgProjectSummariesReadModel,
   PgProjectRepository,
   PgProviderJobLogRetentionStore,
   PgRepositoryBindingRepository,
@@ -1405,22 +1406,22 @@ export function registerRuntimeDependencies(
         new PgAuthBootstrapStatusReader(input.database.db, {
           githubConfigured: Boolean(
             input.config.githubClientId &&
-              input.config.githubClientSecret &&
-              input.config.githubRedirectUri &&
-              input.config.webOrigin,
+            input.config.githubClientSecret &&
+            input.config.githubRedirectUri &&
+            input.config.webOrigin,
           ),
           googleConfigured: Boolean(
             input.config.googleClientId &&
-              input.config.googleClientSecret &&
-              input.config.googleRedirectUri &&
-              input.config.webOrigin,
+            input.config.googleClientSecret &&
+            input.config.googleRedirectUri &&
+            input.config.webOrigin,
           ),
           oidcConfigured: Boolean(
             input.config.oidcClientId &&
-              input.config.oidcClientSecret &&
-              input.config.oidcDiscoveryUrl &&
-              input.config.oidcRedirectUri &&
-              input.config.webOrigin,
+            input.config.oidcClientSecret &&
+            input.config.oidcDiscoveryUrl &&
+            input.config.oidcRedirectUri &&
+            input.config.webOrigin,
           ),
           loginUrl: `${input.config.webOrigin.replace(/\/+$/g, "")}/login`,
         }),
@@ -1707,6 +1708,9 @@ export function registerRuntimeDependencies(
 
   container.register(tokens.projectReadModel, {
     useFactory: instanceCachingFactory(() => new PgProjectReadModel(input.database.db)),
+  });
+  container.register(tokens.projectSummariesReadModel, {
+    useFactory: instanceCachingFactory(() => new PgProjectSummariesReadModel(input.database.db)),
   });
   container.register(tokens.projectOwnershipReadModel, {
     useFactory: instanceCachingFactory(() => new PgProjectReadModel(input.database.db)),

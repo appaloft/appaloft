@@ -35,7 +35,8 @@
 
 ## Public Contracts
 
-- [ ] Add `projects.list-summaries` spec/catalog/query/transport/tests.
+- [x] Add `projects.list-summaries` spec/catalog/query/transport/tests and real Dashboard Projects
+      loading/search/sort/cursor states in the first #1424 tracer slice.
 - [ ] Add `project-environments.overview` spec/catalog/query/transport/tests.
 - [ ] Add `resources.overview` spec/catalog/query/transport/tests.
 - [ ] Add scoped extension navigation metadata while preserving the v1 page renderer.

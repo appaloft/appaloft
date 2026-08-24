@@ -89,6 +89,7 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Create project | Command | `projects.create` | `CreateProjectCommand` | `CreateProjectCommandInput` | `appaloft project create` | `POST /api/projects` |
 | List projects | Product-session member query | `projects.list` | `ListProjectsQuery` | `ListProjectsQueryInput` | `appaloft project list` | `GET /api/projects` |
+| List Dashboard Project summaries | Product-session member query | `projects.list-summaries` | `ListProjectSummariesQuery` | `ListProjectSummariesQueryInput` | Not applicable; `projects.list` remains the compact CLI surface | `GET /api/projects/summaries` |
 | Count projects | Product-session member query | `projects.count` | `CountProjectsQuery` | `CountProjectsQueryInput` | `appaloft project count` | `GET /api/projects/count` |
 | Show project | Product-session member query | `projects.show` | `ShowProjectQuery` | `ShowProjectQueryInput` | `appaloft project show <projectId>` | `GET /api/projects/{projectId}` |
 | Rename project | Command | `projects.rename` | `RenameProjectCommand` | `RenameProjectCommandInput` | `appaloft project rename <projectId> --name <name>` | `POST /api/projects/{projectId}/rename` |

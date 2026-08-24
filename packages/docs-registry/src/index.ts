@@ -4040,6 +4040,13 @@ export const publicDocsOperationCoverage = [
   })),
   { operationKey: "projects.create", status: "documented", topicId: "project.concept" },
   { operationKey: "projects.list", status: "documented", topicId: "project.concept" },
+  {
+    operationKey: "projects.list-summaries",
+    status: "migration-gap",
+    reason:
+      "The dashboard beta query reference exists, but public bilingual task documentation is pending.",
+    targetTopicId: "project.concept",
+  },
   { operationKey: "projects.count", status: "documented", topicId: "project.concept" },
   { operationKey: "projects.show", status: "documented", topicId: "project.lifecycle" },
   {

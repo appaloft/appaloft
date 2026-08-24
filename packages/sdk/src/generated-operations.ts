@@ -3719,6 +3719,24 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "projects.list-summaries",
+    operationGroup: "projects",
+    operationMethod: "listSummaries",
+    facadePath: ["projects", "listSummaries"],
+    operationId: "projects.listSummaries",
+    kind: "query",
+    domain: "projects",
+    messageName: "ListProjectSummariesQuery",
+    route: {
+      method: "GET",
+      path: "/projects/summaries",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "projects.rename",
     operationGroup: "projects",
     operationMethod: "rename",
@@ -8342,6 +8360,7 @@ export interface GeneratedAppaloftClient {
     readonly delete: AppaloftSdkFacadeMethod;
     readonly deleteCheck: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
+    readonly listSummaries: AppaloftSdkFacadeMethod;
     readonly rename: AppaloftSdkFacadeMethod;
     readonly reorder: AppaloftSdkFacadeMethod;
     readonly restore: AppaloftSdkFacadeMethod;

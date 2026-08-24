@@ -241,6 +241,10 @@ export {
   type ListProjectsQueryInput,
   listProjectsQueryInputSchema,
 } from "./operations/projects/list-projects.query";
+export {
+  type ListProjectSummariesQueryInput,
+  listProjectSummariesQueryInputSchema,
+} from "./operations/projects/list-project-summaries.query";
 export * from "./operations/projects/rename-project.schema";
 export {
   type ReorderProjectsCommandInput,

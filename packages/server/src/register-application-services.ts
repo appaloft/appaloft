@@ -390,6 +390,7 @@ import {
   ListPreviewEnvironmentsQueryHandler,
   ListPreviewEnvironmentsQueryService,
   ListProjectsQueryService,
+  ListProjectSummariesQueryService,
   ListProvidersQueryService,
   ListResourceDependencyBindingsQueryHandler,
   ListResourceDependencyBindingsQueryService,
@@ -4373,6 +4374,10 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.countProjectsQueryService, CountProjectsQueryService);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
+  container.registerSingleton(
+    tokens.listProjectSummariesQueryService,
+    ListProjectSummariesQueryService,
+  );
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
   container.registerSingleton(tokens.reorderProjectsUseCase, ReorderProjectsUseCase);
   container.registerSingleton(tokens.setProjectDescriptionUseCase, SetProjectDescriptionUseCase);

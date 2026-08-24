@@ -1757,6 +1757,31 @@ export interface ProjectSummary {
   createdAt: string;
 }
 
+export interface DashboardProjectSummary {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  resourceCount: number;
+  attentionCount: number;
+  attentionStatus: "healthy" | "attention";
+  latestActivityAt?: string;
+}
+
+export interface ProjectSummariesReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      cursor?: string;
+      limit: number;
+      search?: string;
+      sort: "recent-activity-desc" | "name-asc" | "name-desc";
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+    },
+  ): Promise<{ items: DashboardProjectSummary[]; nextCursor?: string }>;
+}
+
 export type ProjectListLifecycleStatus = ProjectSummary["lifecycleStatus"] | "all";
 
 export interface ProjectDeleteSafety {

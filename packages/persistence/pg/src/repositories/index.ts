@@ -42,6 +42,7 @@ export * from "./preview-policy-repository";
 export * from "./process-attempt-journal";
 export * from "./project-deletion-blocker-reader";
 export * from "./project-read-model";
+export * from "./project-summaries-read-model";
 export * from "./project-repository";
 export * from "./provider-job-log-retention-store";
 export * from "./repository-binding-repository";

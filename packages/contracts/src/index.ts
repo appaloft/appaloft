@@ -894,6 +894,22 @@ export const listProjectsResponseSchema = z.object({
   offset: z.number().int().nonnegative(),
 });
 
+export const dashboardProjectSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  description: z.string().optional(),
+  resourceCount: z.number().int().nonnegative(),
+  attentionCount: z.number().int().nonnegative(),
+  attentionStatus: z.enum(["healthy", "attention"]),
+  latestActivityAt: z.string().optional(),
+});
+
+export const listProjectSummariesResponseSchema = z.object({
+  items: z.array(dashboardProjectSummarySchema).max(100),
+  nextCursor: z.string().optional(),
+});
+
 export const showProjectResponseSchema = projectSummarySchema;
 
 export const renameProjectResponseSchema = z.object({
@@ -8415,6 +8431,8 @@ export type DeleteProjectInput = z.infer<typeof deleteProjectInputSchema>;
 export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;
 export type CountResponse = z.infer<typeof countResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
+export type DashboardProjectSummary = z.infer<typeof dashboardProjectSummarySchema>;
+export type ListProjectSummariesResponse = z.infer<typeof listProjectSummariesResponseSchema>;
 export type ShowProjectResponse = z.infer<typeof showProjectResponseSchema>;
 export type RenameProjectResponse = z.infer<typeof renameProjectResponseSchema>;
 export type ReorderProjectsResponse = z.infer<typeof reorderProjectsResponseSchema>;

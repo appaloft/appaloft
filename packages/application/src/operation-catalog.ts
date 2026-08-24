@@ -219,6 +219,7 @@ import { countProjectsQueryInputSchema } from "./operations/projects/count-proje
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { deleteProjectCommandInputSchema } from "./operations/projects/delete-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
+import { listProjectSummariesQueryInputSchema } from "./operations/projects/list-project-summaries.query";
 import { renameProjectCommandInputSchema } from "./operations/projects/rename-project.command";
 import { reorderProjectsCommandInputSchema } from "./operations/projects/reorder-projects.command";
 import { restoreProjectCommandInputSchema } from "./operations/projects/restore-project.command";
@@ -1266,6 +1267,24 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft project list",
       orpc: { method: "GET", path: "/api/projects" },
+    },
+  },
+  {
+    key: "projects.list-summaries",
+    kind: "query",
+    domain: "projects",
+    messageName: "ListProjectSummariesQuery",
+    handlerName: "ListProjectSummariesQueryHandler",
+    serviceName: "ListProjectSummariesQueryService",
+    inputSchema: listProjectSummariesQueryInputSchema,
+    serviceToken: tokens.listProjectSummariesQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "GET", path: "/api/projects/summaries" },
     },
   },
   {
