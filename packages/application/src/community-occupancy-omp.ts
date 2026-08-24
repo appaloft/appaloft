@@ -1,5 +1,7 @@
 export const COMMUNITY_OCCUPANCY_OMP_VERSION = "18.0.3";
 export const COMMUNITY_OCCUPANCY_OMP_BIN = "/var/tmp/appaloft-bin/omp";
+export const COMMUNITY_OCCUPANCY_OMP_NATIVES = "/var/tmp/appaloft-bin/natives";
+export const COMMUNITY_OCCUPANCY_OMP_NATIVE_LINK = "/workspace/.omp/natives";
 export const COMMUNITY_OCCUPANCY_OMP_RELEASE_REPO = "can1357/oh-my-pi";
 
 export function occupancyOmpLinuxAsset(arch: string): "omp-linux-arm64" | "omp-linux-x64" {
@@ -16,4 +18,14 @@ export function occupancyOmpReleaseUrl(
 export function occupancyOmpAttachArgv(argv: readonly string[] | undefined): boolean {
   const command = argv?.[0];
   return command === "omp" || command === COMMUNITY_OCCUPANCY_OMP_BIN;
+}
+
+export function occupancyOmpNativesPrepareScript(): string {
+  return [
+    `mkdir -p ${COMMUNITY_OCCUPANCY_OMP_NATIVES} /workspace/.omp`,
+    `if [ ! -L ${COMMUNITY_OCCUPANCY_OMP_NATIVE_LINK} ]; then`,
+    `rm -rf ${COMMUNITY_OCCUPANCY_OMP_NATIVE_LINK}`,
+    `ln -sfn ${COMMUNITY_OCCUPANCY_OMP_NATIVES} ${COMMUNITY_OCCUPANCY_OMP_NATIVE_LINK}`,
+    "fi",
+  ].join(" && ");
 }

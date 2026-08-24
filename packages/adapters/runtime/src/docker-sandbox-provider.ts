@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   COMMUNITY_OCCUPANCY_OMP_BIN,
   occupancyOmpAttachArgv,
+  occupancyOmpNativesPrepareScript,
   occupancyOmpReleaseUrl,
   type SandboxExecResult,
   type SandboxFileDescriptor,
@@ -525,7 +526,7 @@ export class DockerSandboxProvider implements SandboxProvider {
         "--tmpfs",
         "/var/tmp/appaloft-exec:rw,exec,nosuid,nodev,size=64m",
         "--tmpfs",
-        "/var/tmp/appaloft-bin:rw,exec,nosuid,nodev,size=256m",
+        "/var/tmp/appaloft-bin:rw,exec,nosuid,nodev,size=768m",
         "--env",
         "TMPDIR=/var/tmp/appaloft-exec",
         "--env",
@@ -1828,28 +1829,39 @@ export class DockerSandboxProvider implements SandboxProvider {
       undefined,
       true,
     );
-    if (text(present.stdout).trim() === "yes") return;
-    const arch = text((await this.docker(["exec", container, "uname", "-m"])).stdout).trim();
-    const response = await this.fetchImpl(occupancyOmpReleaseUrl(arch), { redirect: "follow" });
-    if (!response.ok) {
-      throw new Error(`Occupancy omp download failed: HTTP ${String(response.status)}`);
+    if (text(present.stdout).trim() !== "yes") {
+      const arch = text((await this.docker(["exec", container, "uname", "-m"])).stdout).trim();
+      const response = await this.fetchImpl(occupancyOmpReleaseUrl(arch), { redirect: "follow" });
+      if (!response.ok) {
+        throw new Error(`Occupancy omp download failed: HTTP ${String(response.status)}`);
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength === 0) throw new Error("Occupancy omp download is empty");
+      const installed = await this.docker(
+        [
+          "exec",
+          "-i",
+          container,
+          "sh",
+          "-c",
+          `mkdir -p /var/tmp/appaloft-bin && cat > ${COMMUNITY_OCCUPANCY_OMP_BIN} && chmod 755 ${COMMUNITY_OCCUPANCY_OMP_BIN}`,
+        ],
+        { stdin: bytes },
+      );
+      if (installed.exitCode !== 0) {
+        throw new Error(
+          `Occupancy omp install failed: ${installed.stderr || text(installed.stdout)}`,
+        );
+      }
     }
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength === 0) throw new Error("Occupancy omp download is empty");
-    const installed = await this.docker(
-      [
-        "exec",
-        "-i",
-        container,
-        "sh",
-        "-c",
-        `mkdir -p /var/tmp/appaloft-bin && cat > ${COMMUNITY_OCCUPANCY_OMP_BIN} && chmod 755 ${COMMUNITY_OCCUPANCY_OMP_BIN}`,
-      ],
-      { stdin: bytes },
+    const natives = await this.docker(
+      ["exec", container, "sh", "-c", occupancyOmpNativesPrepareScript()],
+      undefined,
+      true,
     );
-    if (installed.exitCode !== 0) {
+    if (natives.exitCode !== 0) {
       throw new Error(
-        `Occupancy omp install failed: ${installed.stderr || text(installed.stdout)}`,
+        `Occupancy omp natives prepare failed: ${natives.stderr || text(natives.stdout)}`,
       );
     }
   }
