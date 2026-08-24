@@ -42,13 +42,12 @@ import { ok, type Result } from "@appaloft/core";
 import { mountAppaloftOrpcRoutes } from "@appaloft/orpc";
 import { Elysia } from "elysia";
 
-const previewPort = 43_000 + (process.pid % 10_000);
-const previewUrl = `http://127.0.0.1:${previewPort}`;
+let previewUrl = "";
 const evidenceDirectory =
   process.env.APPALOFT_DASHBOARD_EVIDENCE_DIR?.trim() ||
   join(tmpdir(), "appaloft-dashboard-evidence");
 
-let previewProcess: ReturnType<typeof Bun.spawn> | undefined;
+let previewServer: ReturnType<typeof Bun.serve> | undefined;
 let apiFixtureServer: ReturnType<typeof Bun.serve> | undefined;
 const apiFixtureRequests: string[] = [];
 const apiFixtureCommands: string[] = [];
@@ -895,32 +894,32 @@ beforeAll(async () => {
     }
   }
   if (!apiFixtureServer) throw new Error("No Dashboard API fixture port was available");
-  previewProcess = Bun.spawn({
-    cmd: [
-      "bun",
-      "run",
-      "preview",
-      "--",
-      "--host",
-      "127.0.0.1",
-      "--port",
-      String(previewPort),
-      "--strictPort",
-    ],
-    cwd: new URL("../..", import.meta.url).pathname,
-    env: {
-      ...process.env,
-      APPALOFT_DASHBOARD_DEV_PROXY_TARGET: `http://127.0.0.1:${apiFixtureServer.port}`,
+  const apiFixturePort = apiFixtureServer.port;
+  previewServer = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch(request) {
+      const requestUrl = new URL(request.url);
+      const pathname = decodeURIComponent(requestUrl.pathname);
+      if (pathname.startsWith("/api/")) {
+        return fetch(
+          new Request(
+            `http://127.0.0.1:${apiFixturePort}${requestUrl.pathname}${requestUrl.search}`,
+            request,
+          ),
+        );
+      }
+      const requestedFile = Bun.file(join(buildRoot, pathname === "/" ? "index.html" : pathname));
+      if (await requestedFile.exists()) return new Response(requestedFile);
+      return new Response(Bun.file(join(buildRoot, "200.html")));
     },
-    stdout: "ignore",
-    stderr: "ignore",
   });
+  previewUrl = `http://127.0.0.1:${previewServer.port}`;
   await waitForPreview();
 });
 
 afterAll(async () => {
-  previewProcess?.kill();
-  await previewProcess?.exited.catch(() => undefined);
+  previewServer?.stop(true);
   apiFixtureServer?.stop(true);
   Bun.WebView.closeAll();
 });
@@ -964,7 +963,14 @@ describe("Dashboard foundation WebView", () => {
           `Boolean(document.querySelector('[data-dashboard-auth="first-admin"] form'))`,
         ),
       Boolean,
-    );
+    ).catch(async (error) => {
+      const diagnostics = await desktop.evaluate(
+        `({ url: location.href, body: document.body.textContent ?? '', html: document.body.innerHTML.slice(0, 1200) })`,
+      );
+      throw new Error(
+        `${String(error)}\n${JSON.stringify({ diagnostics, apiFixtureQueries, apiFixtureRequests })}`,
+      );
+    });
     await desktop.evaluate(`(() => {
       const form = document.querySelector('[data-dashboard-auth="first-admin"] form');
       const inputs = form?.querySelectorAll('input');
