@@ -399,7 +399,9 @@ describe("DockerSandboxProvider", () => {
       process: { argv: ["omp"] },
     });
     expect(fetched[0]).toContain("oh-my-pi/releases/download/v18.0.3/omp-linux-x64");
-    expect(runner.calls.some((call) => call.argv[1] === "cp")).toBe(true);
+    const install = runner.calls.find((call) => call.argv.includes("-i") && call.stdin);
+    expect(new TextDecoder().decode(install?.stdin)).toBe("omp-binary");
+    expect(runner.calls.some((call) => call.argv[1] === "cp")).toBe(false);
     expect(runner.terminalCalls[0]?.argv.at(-1)).toBe("/workspace/.local/bin/omp");
   });
 

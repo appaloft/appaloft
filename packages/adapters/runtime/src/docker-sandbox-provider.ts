@@ -1,7 +1,4 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 
 import {
   COMMUNITY_OCCUPANCY_OMP_BIN,
@@ -1837,15 +1834,21 @@ export class DockerSandboxProvider implements SandboxProvider {
     }
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength === 0) throw new Error("Occupancy omp download is empty");
-    const directory = await mkdtemp(join(tmpdir(), "appaloft-omp-"));
-    const archive = join(directory, "omp");
-    try {
-      await writeFile(archive, bytes);
-      await this.docker(["exec", container, "mkdir", "-p", "/workspace/.local/bin"]);
-      await this.docker(["cp", archive, `${container}:${COMMUNITY_OCCUPANCY_OMP_BIN}`]);
-      await this.docker(["exec", container, "chmod", "755", COMMUNITY_OCCUPANCY_OMP_BIN]);
-    } finally {
-      await unlink(archive).catch(() => undefined);
+    const installed = await this.docker(
+      [
+        "exec",
+        "-i",
+        container,
+        "sh",
+        "-c",
+        `mkdir -p /workspace/.local/bin && cat > ${COMMUNITY_OCCUPANCY_OMP_BIN} && chmod 755 ${COMMUNITY_OCCUPANCY_OMP_BIN}`,
+      ],
+      { stdin: bytes },
+    );
+    if (installed.exitCode !== 0) {
+      throw new Error(
+        `Occupancy omp install failed: ${installed.stderr || text(installed.stdout)}`,
+      );
     }
   }
 
