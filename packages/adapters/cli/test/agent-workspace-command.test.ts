@@ -3422,7 +3422,8 @@ describe("Agent Workspace CLI", () => {
     let attached = false;
     let skillCompletedBeforeAttach = false;
     const { createCliProgram } = await import("../src");
-    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const { OpenAgentWorkspaceCommand, WriteSandboxFileCommand } =
+      await import("@appaloft/application");
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
@@ -3442,8 +3443,13 @@ describe("Agent Workspace CLI", () => {
               },
             } as T);
           }
-          await Bun.sleep(40);
-          if (!attached) skillCompletedBeforeAttach = true;
+          if (
+            command instanceof WriteSandboxFileCommand &&
+            (command.input.path.includes("skills/") || command.input.path.includes(".agents/"))
+          ) {
+            await Bun.sleep(40);
+            if (!attached) skillCompletedBeforeAttach = true;
+          }
           return ok({} as T);
         },
       } as unknown as CommandBus,
