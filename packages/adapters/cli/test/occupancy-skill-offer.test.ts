@@ -170,6 +170,47 @@ test("[WS-REMOTE-HOME-SKILL-182] copies only allowlisted HOME skill roots", asyn
   );
 });
 
+test("[WS-REMOTE-HOME-SKILL-235] copies only the selected HOME skill source", async () => {
+  const homeDir = await mkdtemp(join(tmpdir(), "appaloft-home-source-"));
+  await writeHomeSkill(homeDir, ".claude/skills", "claude-review", { "SKILL.md": "# Claude\n" });
+  await writeHomeSkill(homeDir, ".grok/skills", "grok-plan", { "SKILL.md": "# Grok\n" });
+  const listed = await listOccupancyHomeSkillOfferFiles(homeDir, { source: "grok" });
+  expect(listed.map((file) => file.skillName)).toEqual(["grok-plan"]);
+  const commands: Array<WriteSandboxFileCommand | ExecuteSandboxCommand> = [];
+  const offered = await offerOccupancyHomeSkills({
+    workspaceId: "sbx_ready",
+    homeDir,
+    source: "grok",
+    enabled: true,
+    executeCommand: async (command) => {
+      commands.push(command);
+      return ok({});
+    },
+    destinationExists: async () => false,
+  });
+  expect(offered.skillCount).toBe(1);
+  expect(
+    commands
+      .filter((command) => command instanceof WriteSandboxFileCommand)
+      .map((command) => command.input.path)
+      .filter((path) => path.endsWith("SKILL.md") && path.startsWith("skills/")),
+  ).toEqual(["skills/grok-plan/SKILL.md"]);
+});
+
+test("[WS-REMOTE-HOME-SKILL-236] disabled prefs skip HOME skills", async () => {
+  const homeDir = await mkdtemp(join(tmpdir(), "appaloft-home-disabled-"));
+  await writeHomeSkill(homeDir, ".grok/skills", "grok-plan", { "SKILL.md": "# Grok\n" });
+  const offered = await offerOccupancyHomeSkills({
+    workspaceId: "sbx_ready",
+    homeDir,
+    enabled: false,
+    source: "grok",
+    executeCommand: async () => ok({}),
+    destinationExists: async () => false,
+  });
+  expect(offered).toEqual({ offered: false, fileCount: 0, skillCount: 0, skippedExisting: 0 });
+});
+
 test("[WS-REMOTE-HOME-SKILL-183] skips missing HOME skill directories", async () => {
   const homeDir = await mkdtemp(join(tmpdir(), "appaloft-home-missing-"));
   await writeHomeSkill(homeDir, ".claude/skills", "only-claude", { "SKILL.md": "# One\n" });

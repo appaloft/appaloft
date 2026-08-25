@@ -68,7 +68,7 @@ import {
   quitCodeSessionOnCancel,
   withImmediateSigintExit,
 } from "../folder-project-onboarding.js";
-import { codeSessionInquireInteraction } from "../interaction.js";
+import { codeSessionInquireInteraction, effectCliInteraction } from "../interaction.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
 import {
   launchScratchAgent,
@@ -115,7 +115,11 @@ import {
   offerOccupancyAppaloftSkill,
   offerOccupancyHomeSkills,
 } from "../occupancy-skill-offer.js";
-
+import {
+  inquireOccupancySkillPrefs,
+  resolveOccupancySkillPrefs,
+  saveOccupancySkillPrefs,
+} from "../occupancy-skill-prefs.js";
 import { type OccupancyHarness, resolveOccupancyAgent } from "../occupancy-vendor.js";
 import {
   formatRemoteCodeBanner,
@@ -1065,6 +1069,44 @@ export const workspaceCodeCommand = EffectCommand.make(
           }),
         );
       }
+      const skillPrefsResolution = yield* Effect.tryPromise({
+        try: () =>
+          resolveOccupancySkillPrefs({
+            ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
+            ...(cli.environment ? { env: cli.environment } : {}),
+            ...(yes ? { yes: true } : {}),
+            canPrompt:
+              Boolean(process.stdin.isTTY && process.stdout.isTTY) &&
+              !yes &&
+              !process.argv.some(
+                (argument) => argument.includes(".test.ts") || argument.includes("bun:test"),
+              ),
+          }),
+        catch: (error) => workspaceCliError(error, "occupancy-skill-prefs"),
+      });
+      let occupancySkillPrefs = skillPrefsResolution.prefs;
+      if (skillPrefsResolution.needsPrompt) {
+        const skillPrefInteraction = cli.folderOnboardingInteraction ?? effectCliInteraction;
+        occupancySkillPrefs = yield* inquireOccupancySkillPrefs({
+          present: skillPrefsResolution.present,
+          interaction: skillPrefInteraction,
+        }).pipe(
+          Effect.catchAll((error) => {
+            if (isFolderOnboardingCancelled(error)) {
+              quitCodeSessionOnCancel();
+            }
+            return Effect.fail(workspaceCliError(error, "occupancy-skill-prefs"));
+          }),
+        );
+        yield* Effect.promise(() =>
+          saveOccupancySkillPrefs({
+            prefs: occupancySkillPrefs,
+            ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
+            ...(cli.environment ? { env: cli.environment } : {}),
+          }).catch(() => undefined),
+        );
+      }
+
       if (useOccupancyTui && occupancyTui) {
         const occupancyFolderName = folderDirectoryName(folderOnboardingCwdFromLocator(path));
         yield* Effect.tryPromise({
@@ -1116,6 +1158,11 @@ export const workspaceCodeCommand = EffectCommand.make(
                       });
                       await offerOccupancyHomeSkills({
                         workspaceId: occupied.result.workspaceId,
+                        enabled: occupancySkillPrefs.enabled,
+                        ...(occupancySkillPrefs.source
+                          ? { source: occupancySkillPrefs.source }
+                          : {}),
+                        ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
                         executeCommand: (skillCommand) => cli.executeCommand(skillCommand),
                         destinationExists: occupancyHomeSkillDestinationExists({
                           workspaceId: occupied.result.workspaceId,
@@ -1243,6 +1290,9 @@ export const workspaceCodeCommand = EffectCommand.make(
           if (firstParty.offered) copiedSkillCount += 1;
           const home = await offerOccupancyHomeSkills({
             workspaceId: result.workspaceId,
+            enabled: occupancySkillPrefs.enabled,
+            ...(occupancySkillPrefs.source ? { source: occupancySkillPrefs.source } : {}),
+            ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
             executeCommand: (skillCommand) => timedSkillResult(cli.executeCommand(skillCommand)),
             destinationExists: occupancyHomeSkillDestinationExists({
               workspaceId: result.workspaceId,

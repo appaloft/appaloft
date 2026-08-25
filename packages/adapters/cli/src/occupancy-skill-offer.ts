@@ -16,13 +16,23 @@ export const OCCUPANCY_SKILL_GIT_EXCLUDES = ["/skills/", "/.agents/"] as const;
 export const OCCUPANCY_HOME_SKILL_DESTINATIONS = ["skills", ".agents/skills"] as const;
 export const OCCUPANCY_HOME_SKILL_MAX_FILE_BYTES = 10 * 1024 * 1024;
 
+export const OCCUPANCY_SKILL_SOURCES = [
+  "claude",
+  "codex",
+  "grok",
+  "agents",
+  "cursor",
+  "opencode",
+] as const;
+export type OccupancySkillSource = (typeof OCCUPANCY_SKILL_SOURCES)[number];
+
 export const OCCUPANCY_HOME_SKILL_ROOTS = [
-  { homeRelative: ".claude/skills", railwayAligned: true },
-  { homeRelative: ".codex/skills", railwayAligned: true },
-  { homeRelative: ".grok/skills", railwayAligned: true },
-  { homeRelative: ".agents/skills", railwayAligned: true },
-  { homeRelative: ".cursor/skills", railwayAligned: false },
-  { homeRelative: ".config/opencode/skills", railwayAligned: false },
+  { source: "claude", homeRelative: ".claude/skills", railwayAligned: true },
+  { source: "codex", homeRelative: ".codex/skills", railwayAligned: true },
+  { source: "grok", homeRelative: ".grok/skills", railwayAligned: true },
+  { source: "agents", homeRelative: ".agents/skills", railwayAligned: true },
+  { source: "cursor", homeRelative: ".cursor/skills", railwayAligned: false },
+  { source: "opencode", homeRelative: ".config/opencode/skills", railwayAligned: false },
 ] as const;
 
 // Skill-tree copy still skips auth.json, mcp.json, tokens, and cookies.
@@ -125,11 +135,13 @@ export function isOccupancyHomeSkillSkippedFile(relativePath: string): boolean {
 
 export async function listOccupancyHomeSkillOfferFiles(
   homeDir: string,
+  options?: { readonly source?: OccupancySkillSource },
 ): Promise<OccupancyHomeSkillOfferFile[]> {
   const offered: OccupancyHomeSkillOfferFile[] = [];
   const seenSkillNames = new Set<string>();
 
   for (const root of OCCUPANCY_HOME_SKILL_ROOTS) {
+    if (options?.source && root.source !== options.source) continue;
     const rootPath = join(homeDir, root.homeRelative);
     const entries = await readdir(rootPath, { withFileTypes: true }).catch(() => undefined);
     if (!entries) continue;
@@ -245,6 +257,8 @@ export async function offerOccupancyAppaloftSkill(input: {
 export async function offerOccupancyHomeSkills(input: {
   readonly workspaceId: string;
   readonly homeDir?: string;
+  readonly source?: OccupancySkillSource;
+  readonly enabled?: boolean;
   readonly executeCommand: (
     command: WriteSandboxFileCommand | ExecuteSandboxCommand,
   ) => Promise<Result<unknown>>;
@@ -255,7 +269,12 @@ export async function offerOccupancyHomeSkills(input: {
   readonly skillCount: number;
   readonly skippedExisting: number;
 }> {
-  const files = await listOccupancyHomeSkillOfferFiles(input.homeDir ?? homedir());
+  if (input.enabled === false) {
+    return { offered: false, fileCount: 0, skillCount: 0, skippedExisting: 0 };
+  }
+  const files = await listOccupancyHomeSkillOfferFiles(input.homeDir ?? homedir(), {
+    ...(input.source ? { source: input.source } : {}),
+  });
   if (files.length === 0) {
     return { offered: false, fileCount: 0, skillCount: 0, skippedExisting: 0 };
   }

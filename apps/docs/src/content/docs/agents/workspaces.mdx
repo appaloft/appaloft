@@ -99,10 +99,13 @@ JSON / `--json` 仍可带 `workspaceId`。`workspace show|pause|resume|terminate
 
 <a id="agent-workspace-occupancy-skills" />
 
+第一次交互式 `appaloft code` 会问要不要带上本地 skills；如果本机有多个根，再问读哪一个目录。
+答案写在 `~/.appaloft/agent-prefs.json`。之后启动沿用这次选择。`--yes` 或非 TTY 首次运行会把同步关掉。
+
 对齐 Railway 云 Agent 文档的根是 `~/.claude/skills`、`~/.codex/skills`、`~/.grok/skills`、
 `~/.agents/skills`。Appaloft 还会提供 `~/.cursor/skills` 和 `~/.config/opencode/skills`，
-因为这是用户实际使用的根；这两项**超出 Railway 文档范围**。Railway 文档没有写 plugins、
-MCP 配置、或这两个额外根。
+因为这是用户实际使用的根；这两项**超出 Railway 文档范围**。占用只复制已保存的那一个根，
+不会一次拷全部。
 
 只复制包含 `SKILL.md` 的目录。没有 `SKILL.md` 的文件夹（例如只有 references 的
 `use-railway`）整棵跳过。已存在的沙箱文件不会被覆盖。skill 树不会复制 `mcp.json`、token、

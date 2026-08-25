@@ -110,11 +110,16 @@ HOME may also be copied **add-only** into `/workspace/skills/<name>` and
 
 <a id="agent-workspace-occupancy-skills" />
 
+The first interactive `appaloft code` asks whether to bring local skills and, when more
+than one root exists, which directory to read. Answers are saved in
+`~/.appaloft/agent-prefs.json`. Later launches reuse that choice. `--yes` or a
+non-TTY first run saves skills sync off.
+
 Railway-aligned roots are `~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, and
 `~/.agents/skills`. Appaloft also offers `~/.cursor/skills` and
 `~/.config/opencode/skills` because those are the roots Appaloft users actually use;
-those two roots are **beyond Railway**. Railway docs do not mention plugins, MCP
-config, or those extra roots.
+those two roots are **beyond Railway**. Occupy copies only the saved root, not every
+root at once.
 
 Only directories that contain `SKILL.md` are copied. A folder without `SKILL.md`
 (for example an incomplete `use-railway` tree) is skipped. Existing sandbox files are not

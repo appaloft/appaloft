@@ -20,14 +20,23 @@ import { offerOccupancyFirstPartyMcp } from "./occupancy-mcp-offer.js";
 import {
   listOccupancyHomeSkillOfferFiles,
   occupancyHomeSkillDestinationExists,
+  type OccupancySkillSource,
 } from "./occupancy-skill-offer.js";
 import { type OccupancyHarness, type OccupancyVendor } from "./occupancy-vendor.js";
 
 export async function countOccupancyConnectingSkills(input: {
   readonly homeDir?: string;
   readonly appaloftSkillDir?: string;
+  readonly source?: OccupancySkillSource;
+  readonly enabled?: boolean;
 }): Promise<number> {
-  const homeFiles = await listOccupancyHomeSkillOfferFiles(input.homeDir ?? homedir());
+  if (input.enabled === false) {
+    const appaloftDir = input.appaloftSkillDir ?? resolveAppaloftSkillPath();
+    return appaloftDir ? 1 : 0;
+  }
+  const homeFiles = await listOccupancyHomeSkillOfferFiles(input.homeDir ?? homedir(), {
+    ...(input.source ? { source: input.source } : {}),
+  });
   const homeNames = new Set(homeFiles.map((file) => file.skillName));
   const appaloftDir = input.appaloftSkillDir ?? resolveAppaloftSkillPath();
   return homeNames.size + (appaloftDir ? 1 : 0);
