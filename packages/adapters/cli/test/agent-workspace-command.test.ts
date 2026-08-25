@@ -1213,10 +1213,11 @@ describe("Agent Workspace CLI", () => {
           if (query instanceof ListProjectsQuery) {
             return ok({
               items: [
+                { id: "prj_bound", name: "Bound", lifecycleStatus: "active" },
                 { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
                 { id: "prj_b", name: "Beta", lifecycleStatus: "active" },
               ],
-              total: 2,
+              total: 3,
               limit: 100,
               offset: 0,
             } as T);

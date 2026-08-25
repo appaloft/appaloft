@@ -55,7 +55,8 @@ test("[WS-REMOTE-CONNECT-215] connecting steps exist for Claude and Codex labels
     occupancyConnectingSteps({ vendor: "claude", credentialOffered: true, skillCount: 1 }),
   ).toEqual([
     { id: "credential", message: "Using your Claude credential on the agent" },
-    { id: "skills", message: "Including 1 of your skill" },
+    { id: "skills", message: "Including 1 of your skills" },
+
     { id: "disk", message: "your work is on its disk" },
   ]);
   expect(

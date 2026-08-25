@@ -1181,11 +1181,13 @@ export function createBoundedWorkspaceControlPresentation(
       };
 
       const attachIssuedDescriptor = async (descriptor: SandboxAgentAttachDescriptor) => {
+        const attachingStep = occupancyPrepareStepForProgress(OCCUPANCY_CODE_PROGRESS.attaching);
         await renderer.send({
           type: "progress",
           message: OCCUPANCY_CODE_PROGRESS.attaching,
-          step: occupancyPrepareStepForProgress(OCCUPANCY_CODE_PROGRESS.attaching),
+          ...(attachingStep ? { step: attachingStep } : {}),
         });
+
         if (descriptor.transport === "managed-terminal") {
           await attachManagedTerminal({
             workspaceId: descriptor.workspaceId,
@@ -1289,7 +1291,7 @@ export function createBoundedWorkspaceControlPresentation(
                   await renderer.send({
                     type: "progress",
                     message: lastPrepareStep.message,
-                    step: lastPrepareStep.step,
+                    ...(lastPrepareStep.step ? { step: lastPrepareStep.step } : {}),
                     status: "failed",
                   });
                 } catch {

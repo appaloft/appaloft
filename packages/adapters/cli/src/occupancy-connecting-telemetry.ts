@@ -63,11 +63,11 @@ export function occupancyConnectingSteps(input: {
       message: withPath("Using your OpenCode login", input.credentialPath) + " on the agent",
     });
   }
-  const skillNoun = input.skillCount === 1 ? "skill" : "skills";
   steps.push({
     id: "skills",
-    message: withPath(`Including ${input.skillCount} of your ${skillNoun}`, input.skillsPath),
+    message: withPath(`Including ${input.skillCount} of your skills`, input.skillsPath),
   });
+
   steps.push({
     id: "disk",
     message: input.agentName ? occupancyAgentWokeLine(input.agentName) : "your work is on its disk",
