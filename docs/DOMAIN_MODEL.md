@@ -451,10 +451,19 @@ Governing artifacts:
 
 ### Agent Workspace Entry Workflow
 
-`Agent Workspace` is a public entry workflow, not an aggregate root. It composes one `Sandbox`, one
-subordinate `SandboxAgentRuntime`, optional `TerminalSession` access and optional Sandbox port
-exposures. Its public convenience `workspaceId` is the underlying `SandboxId`; no duplicate
-Workspace repository or lifecycle status is allowed.
+User-facing occupancy identity is an **Agent** (`agt_*`, `agent <display-name>`).
+`Sandbox` is that Agent's current execution environment. Pause, resume, terminate,
+files, and ports stay Sandbox operations. Occupy persists `OccupancyAgent` and the
+kebab `SandboxDisplayName`; `workspaceId` remains the environment id (`sandboxId`).
+CLI/TUI must not invent a second name. See
+[ADR-127](./decisions/ADR-127-occupancy-agent-first-class-identity.md).
+
+
+`Agent Workspace` is a public entry workflow, not an aggregate root. It composes one
+`OccupancyAgent`, one `Sandbox`, one subordinate `SandboxAgentRuntime`, optional
+`TerminalSession` access and optional Sandbox port exposures. No duplicate Workspace
+lifecycle status is allowed.
+
 
 Pi and OpenCode are downstream harness adapters. Pi provides managed Runs and terminal-based
 interactive use. OpenCode may prepare one server reachable only inside the Sandbox provider's

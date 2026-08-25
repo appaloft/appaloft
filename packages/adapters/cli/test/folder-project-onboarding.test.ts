@@ -12,7 +12,7 @@ import {
   ListProjectsQuery,
   ShowProjectQuery,
 } from "@appaloft/application";
-import { err, ok } from "@appaloft/core";
+import { domainError, err, ok } from "@appaloft/core";
 import { Effect, Layer } from "effect";
 import {
   fileFolderProjectLinkStore,
@@ -113,7 +113,10 @@ describe("folder project onboarding", () => {
     const decision = decideFolderProjectOnboarding({
       directoryName: "checkout",
       gitIdentity: "github.com/acme/api",
-      projects: [{ id: "prj_other", name: "other" }],
+      projects: [
+        { id: "prj_other", name: "other" },
+        { id: "prj_api", name: "api" },
+      ],
       binding: {
         projectId: "prj_api",
         repositoryIdentity: "github.com/acme/api",
@@ -125,6 +128,93 @@ describe("folder project onboarding", () => {
       kind: "reuse-binding",
       projectId: "prj_api",
       identity: "github.com/acme/api",
+    });
+  });
+
+  test("[FOLDER-ONBOARD-010] stale binding to a deleted Project creates instead of reusing it", () => {
+    const decision = decideFolderProjectOnboarding({
+      directoryName: "appaloft-cloud",
+      gitIdentity: "github.com/appaloft/appaloft-cloud",
+      projects: [],
+      binding: {
+        projectId: "prj_deleted",
+        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+        status: "active",
+      },
+      canPrompt: false,
+    });
+    expect(decision).toEqual({
+      kind: "create",
+      name: "appaloft-cloud",
+      identity: "github.com/appaloft/appaloft-cloud",
+    });
+  });
+
+  test("[FOLDER-ONBOARD-010] TTY code inquires before creating when the git binding Project is gone", () => {
+    expect(
+      decideFolderProjectOnboarding({
+        directoryName: "appaloft-cloud",
+        gitIdentity: "github.com/appaloft/appaloft-cloud",
+        projects: [],
+        binding: {
+          projectId: "prj_deleted",
+          repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+          status: "active",
+        },
+        canPrompt: true,
+        promptPolicy: "pre-tui-inquire",
+      }),
+    ).toEqual({
+      kind: "inquire",
+      name: "appaloft-cloud",
+      identity: "github.com/appaloft/appaloft-cloud",
+    });
+  });
+
+  test("[FOLDER-ONBOARD-010] create retries with a suffix when the directory slug is taken", async () => {
+    const store = memoryFolderProjectLinkStore();
+    const names: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        if (message instanceof CreateProjectCommand) {
+          names.push(message.name);
+          if (message.name === "appaloft-cloud") {
+            return err(domainError.conflict("Project slug already exists"));
+          }
+          return ok({ id: "prj_suffixed" } as T);
+        }
+        return ok({ id: "unused" } as T);
+      },
+      executeQuery: async <T>() => ok({ items: [], total: 0, limit: 100, offset: 0 } as T),
+    } as never);
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        ensureFolderProjectOnboarding({
+          cwd: "/tmp/appaloft-cloud",
+          store,
+          yes: true,
+          promptPolicy: "auto-create",
+          peekGitIdentity: async () => "github.com/appaloft/appaloft-cloud",
+          writeStatus: () => undefined,
+        }),
+        runtime,
+      ),
+    );
+
+    expect(names).toEqual(["appaloft-cloud", "appaloft-cloud-2"]);
+    expect(result).toMatchObject({
+      projectId: "prj_suffixed",
+      projectName: "appaloft-cloud-2",
+      created: true,
+      identity: "github.com/appaloft/appaloft-cloud",
     });
   });
 
@@ -804,26 +894,20 @@ describe("folder project onboarding", () => {
     }
   });
 
-  test("[FOLDER-ONBOARD-009] forced select stdin ^C restores TTY without Workspace CLI hang", async () => {
-    const restored: string[] = [];
-    setWorkspaceTuiScrollbackWriter((text) => {
-      restored.push(text);
-    });
+  test("[FOLDER-ONBOARD-009] cancel wrapper must not steal TTY bytes from the occupancy TUI", async () => {
     const originalExit = process.exit;
     let exitCode: number | undefined;
     process.exit = ((code?: number) => {
       exitCode = code ?? 0;
     }) as typeof process.exit;
-    const started = Date.now();
     try {
       void withImmediateSigintExit(() => new Promise(() => undefined));
-      process.stdin.emit("data", Buffer.from("\u0003"));
+      process.stdin.emit("data", Buffer.from("hello"));
+      expect(exitCode).toBeUndefined();
+      process.emit("SIGINT");
       expect(exitCode).toBe(130);
-      expect(Date.now() - started).toBeLessThan(2_000);
-      expect(restored.join("")).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
     } finally {
       process.exit = originalExit;
-      setWorkspaceTuiScrollbackWriter(undefined);
     }
   });
 

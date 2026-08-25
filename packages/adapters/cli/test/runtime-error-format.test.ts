@@ -148,6 +148,22 @@ describe("CLI safe error evidence", () => {
     expect(output).not.toContain("validation_error");
   });
 
+  test("prints Agent Adapter child launch cause", () => {
+    const output = formatHumanCliError({
+      code: "infra_error",
+      category: "infra",
+      message: "Agent Adapter child process launch failed",
+      retryable: false,
+      details: {
+        code: "cloud_agent_adapter_credential_child_launch_failed",
+        cause: "Occupancy omp download failed: HTTP 403",
+      },
+    } satisfies DomainError);
+    expect(output).toContain("Agent Adapter child process launch failed");
+    expect(output).toContain("Cause: cloud_agent_adapter_credential_child_launch_failed");
+    expect(output).toContain("Occupancy omp download failed: HTTP 403");
+  });
+
   test("[WS-REMOTE-OPEN-CAUSE-180] human and safe-json keep workspace open cause and repository", () => {
     const error: DomainError = {
       code: "conflict",

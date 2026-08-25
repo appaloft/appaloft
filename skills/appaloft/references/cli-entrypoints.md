@@ -61,10 +61,12 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--server <id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder on a TTY inquires before the session TUI (`Continue` → create a default Project named after the directory → link this folder); `--yes` / non-interactive create-or-links without asking. `^c` quits that inquire immediately. `code` never overlays a project picker on the Cloud Agents alt-screen. `--pi` only selects the Pi harness and does not change chrome. Git remote is correspondence when present and is not required. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`. `--server` pins that Server with the same semantics as
-  `workspace open --server`.   On a TTY, after that inquire, it enters the Cloud Agents session page
-  with the tree hidden and a centered **preparing the agent** wait, then
-  attaches into the remote session. Origin HTTP 502/503 or a Cloudflare
-  bad-gateway / incomplete origin response during **Preparing disk** keeps
+  `workspace open --server`.   On a TTY, after that inquire, it prints
+  `Loading your project` on the normal screen, then enters the Cloud Agents
+  session page with the tree hidden and a centered **preparing the agent**
+  wait (Using your credential / Including your skills / Waking the agent),
+  then attaches into the remote session. Origin HTTP 502/503 or a Cloudflare
+  bad-gateway / incomplete origin response during **Waking the agent** keeps
   that wait panel up, marks the disk step retrying, and retries
   `workspaces.open` on the enrolled Server until a live session attaches or
   the occupy deadline expires. Attach waits for disk prep. An in-flight hang
@@ -85,8 +87,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   pin, not the handle. Never print `sbx_*` on
   that banner, TUI list, or TUI detail. JSON / `--json` may still include
   `workspaceId`.
-  `--no-attach` also prints the connecting steps `using your {Grok|Codex|Claude} credential`,
-  `including N skills`, and `work is on its disk` (`N` is actually copied).
+  `--no-attach` also prints the connecting steps `Using your {Grok|Codex|Claude} credential on the agent`,
+  `Including N of your skills`, and `Woke agent {name}` (`N` is actually copied).
   Skill copy is fail-soft and time-bounded; a timeout does not block occupy.
   Default harness is OpenCode. Default `code` and `code --new` pick the live occupancy / live
   install. Same-name leftover Profiles must not block first success and must not require

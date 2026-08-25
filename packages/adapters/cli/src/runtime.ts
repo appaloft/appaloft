@@ -495,6 +495,10 @@ export function formatHumanCliError(error: unknown): string {
     } else if (codes.length > 1) {
       lines.push(`Cause: ${codes.join(" / ")}`);
     }
+    const cause = humanDetailString(error, "cause");
+    if (cause && !lines.some((line) => line.includes(cause))) {
+      lines.push(cause);
+    }
     const issueMessages = humanValidationIssueMessages(error);
     if (
       issueMessages.length > 0 &&

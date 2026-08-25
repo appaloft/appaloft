@@ -178,10 +178,7 @@ impl HomeState {
 
     pub fn activate(&mut self) -> HomeDecision {
         match self.focus {
-            HomeFocus::Manage => {
-                self.visible = false;
-                HomeDecision::Manage
-            }
+            HomeFocus::Manage => HomeDecision::Manage,
             HomeFocus::NewAgent => HomeDecision::Launch {
                 prompt: nonempty_prompt(&self.prompt),
                 vendor: self.selected_vendor(),

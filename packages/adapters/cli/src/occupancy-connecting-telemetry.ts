@@ -1,3 +1,4 @@
+import { occupancyAgentWokeLine } from "./occupancy-agent-name.js";
 import {
   OCCUPANCY_VENDOR_LABEL,
   type OccupancyHarness,
@@ -17,6 +18,7 @@ export interface OccupancyConnectingTelemetry {
   readonly schemaVersion: typeof OCCUPANCY_CONNECTING_TELEMETRY_SCHEMA;
   readonly vendor?: OccupancyVendor;
   readonly harness: OccupancyHarness;
+  readonly agentName?: string;
   readonly credential?: {
     readonly vendor: OccupancyVendor;
     readonly kind: "auth.json" | "setup-token";
@@ -32,31 +34,43 @@ export interface OccupancyConnectingTelemetry {
   readonly steps: readonly OccupancyConnectingStep[];
 }
 
+function withPath(message: string, path?: string): string {
+  return path ? `${message} (${path})` : message;
+}
+
 export function occupancyConnectingSteps(input: {
   readonly vendor?: OccupancyVendor;
   readonly credentialOffered?: boolean;
   readonly opencodeConnectOffered?: boolean;
   readonly skillCount: number;
+  readonly credentialPath?: string;
+  readonly skillsPath?: string;
+  readonly agentName?: string;
 }): OccupancyConnectingStep[] {
   const steps: OccupancyConnectingStep[] = [];
   if (input.vendor && input.credentialOffered) {
     steps.push({
       id: "credential",
-      message: `using your ${OCCUPANCY_VENDOR_LABEL[input.vendor]} credential`,
+      message:
+        withPath(
+          `Using your ${OCCUPANCY_VENDOR_LABEL[input.vendor]} credential`,
+          input.credentialPath,
+        ) + " on the agent",
     });
   } else if (input.opencodeConnectOffered) {
     steps.push({
       id: "credential",
-      message: "using your OpenCode login",
+      message: withPath("Using your OpenCode login", input.credentialPath) + " on the agent",
     });
   }
   steps.push({
     id: "skills",
-    message: `including ${input.skillCount} skills`,
+    message: withPath(`Including ${input.skillCount} of your skills`, input.skillsPath),
   });
+
   steps.push({
     id: "disk",
-    message: "work is on its disk",
+    message: input.agentName ? occupancyAgentWokeLine(input.agentName) : "your work is on its disk",
   });
   return steps;
 }
@@ -74,11 +88,15 @@ export function occupancyConnectingTelemetry(input: {
   readonly opencodeConnectOffered?: boolean;
   readonly skillCount: number;
   readonly firstPartyMcp: boolean;
+  readonly credentialPath?: string;
+  readonly skillsPath?: string;
+  readonly agentName?: string;
 }): OccupancyConnectingTelemetry {
   return {
     schemaVersion: OCCUPANCY_CONNECTING_TELEMETRY_SCHEMA,
     ...(input.vendor ? { vendor: input.vendor } : {}),
     harness: input.harness,
+    ...(input.agentName ? { agentName: input.agentName } : {}),
     ...(input.credential ? { credential: input.credential } : {}),
     skillCount: input.skillCount,
     workOnDisk: true,
@@ -91,6 +109,9 @@ export function occupancyConnectingTelemetry(input: {
       ...(input.vendor ? { vendor: input.vendor } : {}),
       ...(input.credential ? { credentialOffered: input.credential.offered } : {}),
       ...(input.opencodeConnectOffered ? { opencodeConnectOffered: true } : {}),
+      ...(input.credentialPath ? { credentialPath: input.credentialPath } : {}),
+      ...(input.skillsPath ? { skillsPath: input.skillsPath } : {}),
+      ...(input.agentName ? { agentName: input.agentName } : {}),
     }),
   };
 }

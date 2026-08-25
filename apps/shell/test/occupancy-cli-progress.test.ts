@@ -86,15 +86,15 @@ describe("occupancy CLI shell progress", () => {
     expect(shouldWarmOccupancyTui(["code", "-h"], tty, { folderLinked: true })).toBeFalse();
     expect(shouldWarmOccupancyTui(["workspace", "--help"], tty)).toBeFalse();
     const source = readFileSync(join(import.meta.dir, "../src/index.ts"), "utf8");
-    const firstFrame = source.indexOf("enterOccupancyAltScreen()");
+    const loading = source.indexOf("SHELL_OCCUPANCY_PROGRESS.loadingProject");
     const warmup = source.indexOf("warmupWorkspaceControlRenderer");
     const reflectImport = source.indexOf('import("reflect-metadata")');
     const runImport = source.indexOf('import("./run")');
-    expect(firstFrame).toBeGreaterThan(-1);
+    expect(loading).toBeGreaterThan(-1);
     expect(warmup).toBeGreaterThan(-1);
     expect(reflectImport).toBeGreaterThan(-1);
     expect(runImport).toBeGreaterThan(-1);
-    expect(firstFrame).toBeLessThan(warmup);
+    expect(loading).toBeLessThan(warmup);
     expect(warmup).toBeLessThan(reflectImport);
     expect(warmup).toBeLessThan(runImport);
     expect(source).toContain("@appaloft/adapter-cli/workspace-tui-launch");
@@ -113,7 +113,7 @@ describe("occupancy CLI shell progress", () => {
     expect(launch).not.toContain("operate-presentation");
     expect(launch).not.toContain("reflect-metadata");
     const shell = readFileSync(join(import.meta.dir, "../src/index.ts"), "utf8");
-    expect(shell.indexOf("enterOccupancyAltScreen()")).toBeLessThan(
+    expect(shell.indexOf("SHELL_OCCUPANCY_PROGRESS.loadingProject")).toBeLessThan(
       shell.indexOf("@appaloft/adapter-cli/workspace-tui-launch"),
     );
     expect(shell.indexOf("warmupWorkspaceControlRenderer")).toBeLessThan(

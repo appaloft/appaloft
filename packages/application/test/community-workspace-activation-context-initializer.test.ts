@@ -1,12 +1,17 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { ok } from "@appaloft/core";
+import { ok, ProjectByIdSpec } from "@appaloft/core";
 import { createExecutionContext } from "../src";
 import { CommunityWorkspaceActivationContextInitializer } from "../src/community-workspace-activation-context-initializer";
 import { CreateEnvironmentCommand } from "../src/operations/environments/create-environment.command";
+import { CreateProjectCommand } from "../src/operations/projects/create-project.command";
 import { ConfigureResourceNetworkCommand } from "../src/operations/resources/configure-resource-network.command";
 import { CreateResourceCommand } from "../src/operations/resources/create-resource.command";
+import {
+  BindProjectRepositoryCommand,
+  UnbindRepositoryCommand,
+} from "../src/repository-binding-messages";
 
 const defaultProfile = {
   adapterManifest: { adapter: true },
@@ -907,5 +912,128 @@ describe("Community occupancy initializer", () => {
     expect(result.isOk()).toBe(true);
     expect(installed).toEqual([{ adapter: "pi" }, { profile: "pi" }]);
     expect(executed).toHaveLength(0);
+  });
+
+  test("[FOLDER-ONBOARD-010] creates a Project when the Repository Binding Project is gone", async () => {
+    const executed: unknown[] = [];
+    const createdProject = {
+      id: { value: "prj_new" },
+      toState: () => ({
+        lifecycleStatus: { value: "active" },
+        defaultWorkspaceProfileInstallationId: { value: "awpi_demo" },
+      }),
+    };
+    let binding: {
+      binding: {
+        toState: () => { status: "active" | "unbound"; projectId: { value: string } };
+      };
+    } | null = {
+      binding: {
+        toState: () => ({
+          status: "active",
+          projectId: { value: "prj_dead" },
+        }),
+      },
+    };
+    const initializer = new CommunityWorkspaceActivationContextInitializer({
+      commandBus: {
+        execute: async (_context: unknown, command: unknown) => {
+          executed.push(command);
+          if (command instanceof CreateProjectCommand) return ok({ id: "prj_new" });
+          if (command instanceof UnbindRepositoryCommand) {
+            binding = null;
+            return ok({
+              bindingId: "rbd_dead",
+              repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+              projectId: "prj_dead",
+              status: "unbound",
+              createdAt: "2026-08-24T00:00:00.000Z",
+            });
+          }
+          if (command instanceof BindProjectRepositoryCommand) {
+            binding = {
+              binding: {
+                toState: () => ({
+                  status: "active",
+                  projectId: { value: command.input.projectId },
+                }),
+              },
+            };
+            return ok({
+              bindingId: "rbd_new",
+              repositoryIdentity: command.input.repositoryIdentity,
+              projectId: command.input.projectId,
+              status: "active",
+              createdAt: "2026-08-24T00:00:01.000Z",
+            });
+          }
+          return ok({ id: "unused" });
+        },
+      } as never,
+      projects: {
+        findOne: async (_context: unknown, spec: unknown) => {
+          if (spec instanceof ProjectByIdSpec && spec.id.value === "prj_new") {
+            return createdProject as never;
+          }
+          return null;
+        },
+        upsert: async () => undefined,
+      },
+      environments: {
+        findOne: async () => ({ id: { value: "env_local" } }),
+        upsert: async () => undefined,
+      } as never,
+      resources: {
+        findOne: async () => ({
+          id: { value: "res_app" },
+          toState: () => ({ networkProfile: { internalPort: { value: 80 } } }),
+        }),
+        upsert: async () => undefined,
+      } as never,
+      repositoryBindings: {
+        findByIdentity: async () => binding,
+        findByIdentityAndProject: async (
+          _context: unknown,
+          _identity: string,
+          projectId: string,
+        ) => (binding?.binding.toState().projectId.value === projectId ? binding : null),
+        save: async () => undefined,
+      } as never,
+      adapters: {
+        install: async () => ok({ installationId: "aai_new" }),
+      } as never,
+      profiles: {
+        validate: () => ok({ definitionDigest: "sha256:new" }),
+        install: async () => ok({ installationId: "awpi_new" }),
+      } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => null,
+        listInstallations: async () => [],
+      } as never,
+      defaultProfile,
+    });
+
+    const result = await initializer.ensure(
+      createExecutionContext({
+        requestId: "req_stale_binding_project",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "tenant_1" },
+      }),
+      {
+        repository: "https://github.com/appaloft/appaloft-cloud.git",
+        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+        missing: "repository-binding",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value.project).toBe("created");
+    expect(result.value.repositoryBinding).toBe("created");
+    expect(result.value.projectId).toBe("prj_new");
+    expect(executed.some((command) => command instanceof CreateProjectCommand)).toBe(true);
+    expect(executed.some((command) => command instanceof UnbindRepositoryCommand)).toBe(true);
+    expect(executed.some((command) => command instanceof BindProjectRepositoryCommand)).toBe(true);
   });
 });

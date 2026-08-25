@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { WriteSandboxFileCommand } from "@appaloft/application";
+import { ExecuteSandboxCommand, WriteSandboxFileCommand } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
 
 import { type OccupancyVendor, occupancyAppaloftHome } from "./occupancy-vendor.js";
@@ -142,7 +142,9 @@ export async function offerOccupancyVendorCredential(input: {
   readonly vendor: OccupancyVendor;
   readonly homeDir?: string;
   readonly env?: NodeJS.ProcessEnv;
-  readonly executeCommand: (command: WriteSandboxFileCommand) => Promise<Result<unknown>>;
+  readonly executeCommand: (
+    command: WriteSandboxFileCommand | ExecuteSandboxCommand,
+  ) => Promise<Result<unknown>>;
   readonly destinationExists?: (path: string) => Promise<boolean>;
 }): Promise<{
   readonly offered: boolean;
@@ -167,5 +169,10 @@ export async function offerOccupancyVendorCredential(input: {
   if (command.isErr()) return { offered: false };
   const written = await input.executeCommand(command.value);
   if (written.isErr()) return { offered: false };
+  const locked = ExecuteSandboxCommand.create({
+    sandboxId: input.workspaceId,
+    argv: ["chmod", "600", `/workspace/${file.occupancyPath}`],
+  });
+  if (locked.isOk()) await input.executeCommand(locked.value);
   return { offered: true, occupancyPath: file.occupancyPath, kind: file.kind };
 }

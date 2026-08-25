@@ -17,6 +17,7 @@ import {
   Project,
   ProjectId,
   ProjectName,
+  ProjectByIdSpec,
   ProjectRepositoryBinding,
   ProjectRepositoryBindingId,
   RepositoryIdentity,
@@ -130,6 +131,7 @@ async function fixture(
     omitBinding?: boolean;
     omitDefaultProfile?: boolean;
     placement?: WorkspaceOpenPlacementPort;
+    projectFinder?: ProjectRepository["findOne"];
     initializerFactory?: (state: {
       project: Project;
       binding: ProjectRepositoryBinding;
@@ -200,7 +202,7 @@ async function fixture(
       ._unsafeUnwrap();
   }
   const projects: ProjectRepository = {
-    findOne: async () => project,
+    findOne: options.projectFinder ?? (async () => project),
     upsert: async () => undefined,
   };
   const repositoryBindings = new InMemoryRepositoryBindingRepository();
@@ -847,5 +849,50 @@ describe("Agent Workspace open preflight", () => {
     expect(result.error.details?.repositoryIdentity).toBe("github.com/Acme/Web");
     expect(String(result.error.details?.guidance)).toContain("github.com/Acme/Web");
     expect(String(result.error.details?.guidance)).toContain("cannot invent a Workspace");
+  });
+
+  test("[FOLDER-ONBOARD-010] unavailable binding Project is recovered by find-or-create", async () => {
+    const replacement = Project.create({
+      id: ProjectId.rehydrate("prj_replacement"),
+      name: ProjectName.rehydrate("Replacement"),
+      createdAt: CreatedAt.rehydrate("2026-08-24T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    replacement
+      .configureWorkspaceProfile({
+        profileInstallationId: AgentWorkspaceProfileInstallationId.rehydrate("awpi_default"),
+        configuredAt: UpdatedAt.rehydrate("2026-08-24T00:00:01.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const { service } = await fixture({
+      projectFinder: async (_context, spec) => {
+        const id = spec instanceof ProjectByIdSpec ? spec.id.value : undefined;
+        return id === "prj_replacement" ? replacement : null;
+      },
+      initializerFactory: ({ repositoryBindings }) => ({
+        ensure: async () => {
+          const rebound = ProjectRepositoryBinding.bind({
+            id: ProjectRepositoryBindingId.rehydrate("rbd_replacement"),
+            repositoryIdentity: RepositoryIdentity.rehydrate("github.com/Acme/Web"),
+            projectId: ProjectId.rehydrate("prj_replacement"),
+            createdAt: CreatedAt.rehydrate("2026-08-24T00:00:02.000Z"),
+          })._unsafeUnwrap();
+          await repositoryBindings.save(toRepositoryContext(context), rebound);
+          return ok({
+            project: "created" as const,
+            repositoryBinding: "created" as const,
+            profile: "reused" as const,
+            projectId: "prj_replacement",
+          });
+        },
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    const result = await service.resolveContext(context, input);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value.projectId).toBe("prj_replacement");
   });
 });

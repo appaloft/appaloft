@@ -147,7 +147,7 @@ describe("community remote default profile", () => {
     const profile = createCommunityRemoteDefaultProfile({
       harnessKey: "omp",
       templateId: "aht_omp_managed_v1",
-      sandboxTemplateId: "tpl_pi",
+      sandboxTemplateId: "stp_appaloft_remote_omp",
       version: "1.0.0",
       templateDigest: `sha256:${"c".repeat(64)}`,
       interaction: {

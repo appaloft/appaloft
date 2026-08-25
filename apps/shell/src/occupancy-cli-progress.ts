@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 export const SHELL_OCCUPANCY_PROGRESS = {
   openingRemoteSession: "Opening remote session…",
   openingScratchSession: "Opening scratch session…",
+  loadingProject: "Loading your project",
 } as const;
 
 export function folderHasPersistedProjectLink(

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  pauseParentStdinForOccupancyTui,
   leaveWorkspaceTuiOnce,
   resetWorkspaceControlRendererWarmup,
   resetWorkspaceTuiScrollbackRestoreState,
@@ -393,5 +394,20 @@ describe("occupancy TUI slim launch", () => {
     expect(rustLeaves).toHaveLength(1);
     expect(writes).toHaveLength(0);
     resetWorkspaceControlRendererWarmup();
+  });
+
+  test("[WS-TUI-FOCUS-005] parent stdin is paused so the TUI owns every key", () => {
+    const calls: string[] = [];
+    const release = pauseParentStdinForOccupancyTui({
+      pause: () => {
+        calls.push("pause");
+      },
+      setRawMode: (enabled) => {
+        calls.push(`raw:${enabled}`);
+      },
+    });
+    expect(calls).toEqual(["pause", "raw:false"]);
+    release();
+    expect(calls).toEqual(["pause", "raw:false", "pause"]);
   });
 });

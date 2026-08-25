@@ -1100,7 +1100,9 @@ export async function resolveDefaultRemoteCodeDoor(
         ? await resolveRemoteCodeRef(locator, probe.runGit)
         : await probe.resolveRemoteRef(locator.repository, locator.ref);
   }
-
+  if (!explicitRemote) {
+    await loadFolderOnboarding();
+  }
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
   const projectId =
     folderOnboarding?.projectId && folderOnboarding.identity === locator.repositoryIdentity

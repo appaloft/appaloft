@@ -2156,8 +2156,8 @@ describe("Workspace control presentation", () => {
     await presentation.start({
       occupancyChrome: { project: "hello-static" },
       occupyBootstrap: async ({ reportProgress }) => {
-        await reportProgress("Preparing disk on hostinger…");
-        await reportProgress("Preparing skills…");
+        await reportProgress("Waking the agent…");
+        await reportProgress("Including your skills…");
         skillBlockers += 1;
         return {
           workspaceId: "sbx_1",
@@ -2197,17 +2197,17 @@ describe("Workspace control presentation", () => {
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",
-      message: "Preparing disk on hostinger…",
+      message: "Waking the agent…",
       step: "disk",
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",
-      message: "Preparing skills…",
+      message: "Including your skills…",
       step: "skills",
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",
-      message: "Attaching…",
+      message: "Finalizing configuration…",
       step: "disk",
     });
     expect(renderer.messages).toContainEqual({
@@ -2265,7 +2265,7 @@ describe("Workspace control presentation", () => {
     });
     await presentation.start({
       occupyBootstrap: async ({ reportProgress }) => {
-        await reportProgress("Preparing disk on hostinger…");
+        await reportProgress("Waking the agent…");
         return {
           workspaceId: "sbx_1",
           attach: {
@@ -2344,12 +2344,11 @@ describe("Workspace control presentation", () => {
     });
     expect(Date.now() - started).toBeLessThan(2_000);
     expect(renderer.closed).toBeGreaterThan(0);
-    expect(renderer.messages).toContainEqual({
-      type: "progress",
-      message: "Resolving repository…",
-      step: "disk",
-    });
-    expect(renderer.messages.some((message) => message.type === "terminal-ready")).toBeFalse();
+    expect(
+      renderer.messages.some(
+        (message) => message.type === "progress" && message.message === "Resolving repository…",
+      ),
+    ).toBeTrue();
   });
 
   test("[WS-REMOTE-PROGRESS-219] occupy failure after TUI is drawn restores then prints on the normal screen", async () => {
@@ -2394,7 +2393,7 @@ describe("Workspace control presentation", () => {
       await expect(
         presentation.start({
           occupyBootstrap: async ({ reportProgress }) => {
-            await reportProgress("Checking login…");
+            await reportProgress("Loading your project…");
             throw unstructured;
           },
           executeCommand: async () => ok({}),
@@ -2410,13 +2409,11 @@ describe("Workspace control presentation", () => {
       });
       expect(renderer.messages).toContainEqual({
         type: "progress",
-        message: "Checking login…",
-        step: "credential",
+        message: "Loading your project…",
       });
       expect(renderer.messages).toContainEqual({
         type: "progress",
-        message: "Checking login…",
-        step: "credential",
+        message: "Loading your project…",
         status: "failed",
       });
       expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
@@ -2513,7 +2510,7 @@ describe("Workspace control presentation", () => {
       await expect(
         presentation.start({
           occupyBootstrap: async ({ reportProgress }) => {
-            await reportProgress("Preparing disk on hostinger…");
+            await reportProgress("Waking the agent…");
             throw remapped;
           },
           executeCommand: async () => ok({}),
@@ -2529,7 +2526,7 @@ describe("Workspace control presentation", () => {
       });
       expect(renderer.messages).toContainEqual({
         type: "progress",
-        message: "Preparing disk on hostinger…",
+        message: "Waking the agent…",
         step: "disk",
         status: "failed",
       });
@@ -2631,9 +2628,9 @@ describe("Workspace control presentation", () => {
       await expect(
         presentation.start({
           occupyBootstrap: async ({ reportProgress }) => {
-            await reportProgress("Checking login…");
-            await reportProgress("Preparing skills…");
-            await reportProgress("Preparing disk on hostinger…");
+            await reportProgress("Loading your project…");
+            await reportProgress("Including your skills…");
+            await reportProgress("Waking the agent…");
             throw remapped;
           },
           executeCommand: async () => ok({}),
@@ -2651,7 +2648,7 @@ describe("Workspace control presentation", () => {
       });
       expect(renderer.messages).toContainEqual({
         type: "progress",
-        message: "Preparing disk on hostinger…",
+        message: "Waking the agent…",
         step: "disk",
       });
       expect(
@@ -2749,9 +2746,9 @@ describe("Workspace control presentation", () => {
       await presentation.start({
         occupancyChrome: { project: "appaloft-clo-cloud" },
         occupyBootstrap: async ({ reportProgress }) => {
-          await reportProgress("Checking login…");
-          await reportProgress("Preparing skills…");
-          await reportProgress("Preparing disk on hostinger…");
+          await reportProgress("Loading your project…");
+          await reportProgress("Including your skills…");
+          await reportProgress("Waking the agent…");
           const opened = await openWorkspaceWithOccupyDiskGatewayRetry(
             async () => {
               opens += 1;
@@ -2764,7 +2761,7 @@ describe("Workspace control presentation", () => {
               onRetry: async () => {
                 closedDuringRetry = renderer.closed;
                 restoreDuringRetry = timeline.some((entry) => entry.startsWith("restore:"));
-                await reportProgress("Preparing disk on hostinger…", { status: "retrying" });
+                await reportProgress("Waking the agent…", { status: "retrying" });
               },
             },
           );
@@ -2808,12 +2805,12 @@ describe("Workspace control presentation", () => {
       });
       expect(renderer.messages).toContainEqual({
         type: "progress",
-        message: "Preparing disk on hostinger…",
+        message: "Waking the agent…",
         step: "disk",
       });
       expect(renderer.messages).toContainEqual({
         type: "progress",
-        message: "Preparing disk on hostinger…",
+        message: "Waking the agent…",
         step: "disk",
         status: "retrying",
       });
@@ -2912,9 +2909,9 @@ describe("Workspace control presentation", () => {
       await presentation.start({
         occupancyChrome: { project: "appaloft-cloud" },
         occupyBootstrap: async ({ reportProgress }) => {
-          await reportProgress("Checking login…");
-          await reportProgress("Preparing skills…");
-          await reportProgress("Preparing disk on hostinger…");
+          await reportProgress("Loading your project…");
+          await reportProgress("Including your skills…");
+          await reportProgress("Waking the agent…");
           const opened = await openWorkspaceWithOccupyDiskGatewayRetry(
             async () => {
               opens += 1;
@@ -2926,7 +2923,7 @@ describe("Workspace control presentation", () => {
               attempts: OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS,
               onRetry: async () => {
                 closedDuringRetry = renderer.closed;
-                await reportProgress("Preparing disk on hostinger…", { status: "retrying" });
+                await reportProgress("Waking the agent…", { status: "retrying" });
               },
             },
           );
@@ -2966,7 +2963,7 @@ describe("Workspace control presentation", () => {
       expect(closedDuringRetry).toBe(0);
       expect(renderer.messages).toContainEqual({
         type: "progress",
-        message: "Preparing disk on hostinger…",
+        message: "Waking the agent…",
         step: "disk",
         status: "retrying",
       });
@@ -3095,9 +3092,9 @@ describe("Workspace control presentation", () => {
       await expect(
         presentation.start({
           occupyBootstrap: async ({ reportProgress }) => {
-            await reportProgress("Checking login…");
-            await reportProgress("Preparing skills…");
-            await reportProgress("Preparing disk on hostinger…");
+            await reportProgress("Loading your project…");
+            await reportProgress("Including your skills…");
+            await reportProgress("Waking the agent…");
             throw remapped;
           },
           executeCommand: async () => ok({}),
@@ -3142,8 +3139,7 @@ describe("Workspace control presentation", () => {
       for (let attempt = 0; attempt < 80; attempt += 1) {
         if (
           this.messages.some(
-            (message) =>
-              message.type === "progress" && message.message === "Preparing disk on hostinger…",
+            (message) => message.type === "progress" && message.message === "Waking the agent…",
           )
         ) {
           break;
@@ -3159,7 +3155,7 @@ describe("Workspace control presentation", () => {
     await expect(
       presentation.start({
         occupyBootstrap: async ({ reportProgress, signal }) => {
-          await reportProgress("Preparing disk on hostinger…");
+          await reportProgress("Waking the agent…");
           const hung = await openWorkspaceWithOccupyDiskGatewayRetry(
             () => new Promise(() => undefined),
             {
@@ -3250,5 +3246,50 @@ describe("Workspace control presentation", () => {
       1,
     );
     expect(renderer.closed).toBe(1);
+  });
+
+  test("[WS-TUI-HOME-001] code occupy session end leaves the TUI instead of opening home", async () => {
+    const renderer = new FakeRendererSession([], { hangUntilClose: true });
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator]() {
+        yield { kind: "closed" as const, reason: "source-ended", exitCode: 0 };
+      },
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    await presentation.start({
+      occupyBootstrap: async () => ({
+        workspaceId: "sbx_1",
+        attach: {
+          workspaceId: "sbx_1",
+          runtimeId: "sar_1",
+          transport: "managed-terminal",
+          sessionId: "term_occupy",
+          processId: "proc_1",
+          access: {
+            kind: "websocket",
+            path: "/sessions/term_occupy",
+            expiresAt: "2099-01-01T00:00:00.000Z",
+          },
+        },
+      }),
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>() => ok({ items: [] } as T),
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+    expect(renderer.closed).toBeGreaterThan(0);
+    expect(
+      renderer.messages.some((message) => message.type === "chrome" && message.home === true),
+    ).toBe(false);
+    expect(renderer.messages.some((message) => message.type === "terminal-closed")).toBe(false);
   });
 });

@@ -1141,11 +1141,18 @@ export function createBoundedWorkspaceControlPresentation(
                   data: frame.data,
                 });
               } else if (frame.kind === "closed") {
-                await renderer.send({
-                  type: "terminal-closed",
-                  reason: frame.reason,
-                  ...(frame.exitCode === undefined ? {} : { exitCode: frame.exitCode }),
-                });
+                if (context.occupancyHome) {
+                  await renderer.send({
+                    type: "terminal-closed",
+                    reason: frame.reason,
+                    ...(frame.exitCode === undefined ? {} : { exitCode: frame.exitCode }),
+                  });
+                } else if (presentationOpen) {
+                  presentationOpen = false;
+                  occupyAbort.abort();
+                  await leaveWorkspaceTuiOnce(renderer);
+                  break;
+                }
               } else if (frame.kind === "error") {
                 await renderer.send(safeError(frame.error, "workspace-control-terminal"));
               }
@@ -1174,11 +1181,13 @@ export function createBoundedWorkspaceControlPresentation(
       };
 
       const attachIssuedDescriptor = async (descriptor: SandboxAgentAttachDescriptor) => {
+        const attachingStep = occupancyPrepareStepForProgress(OCCUPANCY_CODE_PROGRESS.attaching);
         await renderer.send({
           type: "progress",
           message: OCCUPANCY_CODE_PROGRESS.attaching,
-          step: occupancyPrepareStepForProgress(OCCUPANCY_CODE_PROGRESS.attaching),
+          ...(attachingStep ? { step: attachingStep } : {}),
         });
+
         if (descriptor.transport === "managed-terminal") {
           await attachManagedTerminal({
             workspaceId: descriptor.workspaceId,
@@ -1230,14 +1239,12 @@ export function createBoundedWorkspaceControlPresentation(
               signal: occupyAbort.signal,
               reportProgress: async (message, options) => {
                 if (!presentationOpen) return;
-                lastPrepareStep = {
-                  message,
-                  step: occupancyPrepareStepForProgress(message),
-                };
+                const step = occupancyPrepareStepForProgress(message);
+                lastPrepareStep = { message, step };
                 await renderer.send({
                   type: "progress",
                   message,
-                  step: lastPrepareStep.step,
+                  ...(step ? { step } : {}),
                   ...(options?.status ? { status: options.status } : {}),
                 });
               },
@@ -1284,7 +1291,7 @@ export function createBoundedWorkspaceControlPresentation(
                   await renderer.send({
                     type: "progress",
                     message: lastPrepareStep.message,
-                    step: lastPrepareStep.step,
+                    ...(lastPrepareStep.step ? { step: lastPrepareStep.step } : {}),
                     status: "failed",
                   });
                 } catch {
@@ -1353,14 +1360,12 @@ export function createBoundedWorkspaceControlPresentation(
                   ...(event.prompt ? { prompt: event.prompt } : {}),
                   reportProgress: async (message, options) => {
                     if (!presentationOpen) return;
-                    lastPrepareStep = {
-                      message,
-                      step: occupancyPrepareStepForProgress(message),
-                    };
+                    const step = occupancyPrepareStepForProgress(message);
+                    lastPrepareStep = { message, step };
                     await renderer.send({
                       type: "progress",
                       message,
-                      step: lastPrepareStep.step,
+                      ...(step ? { step } : {}),
                       ...(options?.status ? { status: options.status } : {}),
                     });
                   },

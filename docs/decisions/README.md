@@ -143,6 +143,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-124: Sandbox Display Name](./ADR-124-sandbox-display-name.md) | Accepted | Persist a readable display name on Sandbox; user surfaces never paint `sbx_*`; ids stay `sbx_*`. Adjective-noun kebab is Appaloft's generator, not a Railway formula. |
 | [ADR-125: Occupancy Agent Identity And Project Binding](./ADR-125-occupancy-agent-and-project-binding.md) | Accepted | User-facing occupancy is Agent with kebab name; Binding rebinds default Project; Resource remains the Service. |
 | [ADR-126: Contextual Dashboard And Web Route Boundary](./ADR-126-contextual-dashboard-and-web-route-boundary.md) | Accepted | Introduces a public parallel Dashboard with owner-scoped navigation, bounded summary projections, additive scoped extension metadata, versioned design presets, and intentionally breaking pre-1.0 Web routes. |
+| [ADR-127: Occupancy Agent Is First-Class Identity](./ADR-127-occupancy-agent-first-class-identity.md) | Accepted | Agent is the user-facing handle; Sandbox is the current environment. CLI must use persisted occupy `name`, not a folder hash. |
 
 ## Authoring Rules
 

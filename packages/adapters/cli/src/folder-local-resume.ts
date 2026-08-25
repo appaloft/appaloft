@@ -9,6 +9,8 @@ export interface FolderLocalResume {
   readonly repositoryIdentity: string;
   readonly workspaceId: string;
   readonly runtimeId?: string;
+  readonly agentId?: string;
+  readonly name?: string;
   readonly targetServerId?: string;
   readonly profile?: string;
   readonly updatedAt: string;
@@ -61,6 +63,8 @@ function parseResume(value: unknown): FolderLocalResume | undefined {
   if (!repositoryIdentity || !workspaceId) return undefined;
   const updatedAt = readOptionalString(value, "updatedAt") ?? new Date(0).toISOString();
   const runtimeId = readOptionalString(value, "runtimeId");
+  const agentId = readOptionalString(value, "agentId");
+  const name = readOptionalString(value, "name");
   const targetServerId = readOptionalString(value, "targetServerId");
   const profile = readOptionalString(value, "profile");
   return {
@@ -68,6 +72,8 @@ function parseResume(value: unknown): FolderLocalResume | undefined {
     workspaceId,
     updatedAt,
     ...(runtimeId ? { runtimeId } : {}),
+    ...(agentId ? { agentId } : {}),
+    ...(name ? { name } : {}),
     ...(targetServerId ? { targetServerId } : {}),
     ...(profile ? { profile } : {}),
   };
@@ -146,6 +152,8 @@ export async function writeFolderLocalResume(
     readonly repositoryIdentity: string;
     readonly workspaceId: string;
     readonly runtimeId?: string;
+    readonly agentId?: string;
+    readonly name?: string;
     readonly targetServerId?: string;
     readonly profile?: string;
     readonly now?: string;
@@ -157,9 +165,12 @@ export async function writeFolderLocalResume(
     workspaceId: input.workspaceId,
     updatedAt: input.now ?? new Date().toISOString(),
     ...(input.runtimeId ? { runtimeId: input.runtimeId } : {}),
+    ...(input.agentId ? { agentId: input.agentId } : {}),
+    ...(input.name ? { name: input.name } : {}),
     ...(input.targetServerId ? { targetServerId: input.targetServerId } : {}),
     ...(input.profile ? { profile: input.profile } : {}),
   };
+
   const data = await store.read();
   await store.write({
     schemaVersion: FOLDER_LOCAL_RESUME_SCHEMA_VERSION,

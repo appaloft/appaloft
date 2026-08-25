@@ -1338,6 +1338,8 @@ export interface Database {
   agent_workspace_profile_references: AgentWorkspaceProfileReferencesTable;
   project_repository_bindings: ProjectRepositoryBindingsTable;
   workspace_open_entries: WorkspaceOpenEntriesTable;
+  occupancy_agents: OccupancyAgentsTable;
+
   execution_sandboxes: ExecutionSandboxesTable;
   execution_sandbox_snapshots: ExecutionSandboxSnapshotsTable;
   execution_sandbox_templates: ExecutionSandboxTemplatesTable;
@@ -1646,6 +1648,20 @@ export interface WorkspaceOpenEntriesTable {
   phase: string;
   error_code: string | null;
   preferred: boolean;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface OccupancyAgentsTable {
+  tenant_id: string;
+  id: string;
+  name: string;
+  subject_id: string;
+  project_id: string;
+  repository_identity: string;
+  branch: string;
+  sandbox_id: string;
+  status: string;
   created_at: TimestampColumn;
   updated_at: UpdatableTimestampColumn;
 }

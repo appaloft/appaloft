@@ -33,6 +33,8 @@ export const tokens = {
   agentWorkspaceOpenService: Symbol.for("appaloft.agent_workspace_open_service"),
   agentWorkspaceOpenPreflightService: Symbol.for("appaloft.agent_workspace_open_preflight_service"),
   workspaceOpenEntryRepository: Symbol.for("appaloft.workspace_open_entry_repository"),
+  occupancyAgentRepository: Symbol.for("appaloft.occupancy_agent_repository"),
+
   workspaceOpenCredentialAdmission: Symbol.for("appaloft.workspace_open_credential_admission"),
   workspaceOpenMcpAdmission: Symbol.for("appaloft.workspace_open_mcp_admission"),
   workspaceOpenSourceCredentialProvider: Symbol.for(

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import {
   COMMUNITY_OCCUPANCY_OMP_BIN,
+  COMMUNITY_OCCUPANCY_OMP_INSTALL_TIMEOUT_MS,
   occupancyOmpAttachArgv,
   occupancyOmpNativesPrepareScript,
   occupancyOmpReleaseUrl,
@@ -1818,13 +1819,14 @@ export class DockerSandboxProvider implements SandboxProvider {
   }
 
   private async ensureOccupancyOmp(container: string): Promise<void> {
+
     const present = await this.docker(
       [
         "exec",
         container,
         "sh",
         "-c",
-        `if [ -x ${COMMUNITY_OCCUPANCY_OMP_BIN} ]; then echo yes; else echo no; fi`,
+        `if [ -x ${COMMUNITY_OCCUPANCY_OMP_BIN} ] || [ -x /var/tmp/appaloft-bin/omp ]; then echo yes; else echo no; fi`,
       ],
       undefined,
       true,
@@ -1836,7 +1838,6 @@ export class DockerSandboxProvider implements SandboxProvider {
         throw new Error(`Occupancy omp download failed: HTTP ${String(response.status)}`);
       }
       const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength === 0) throw new Error("Occupancy omp download is empty");
       const installed = await this.docker(
         [
           "exec",
@@ -1846,7 +1847,7 @@ export class DockerSandboxProvider implements SandboxProvider {
           "-c",
           `mkdir -p /var/tmp/appaloft-bin && cat > ${COMMUNITY_OCCUPANCY_OMP_BIN} && chmod 755 ${COMMUNITY_OCCUPANCY_OMP_BIN}`,
         ],
-        { stdin: bytes },
+        { stdin: bytes, timeoutMs: COMMUNITY_OCCUPANCY_OMP_INSTALL_TIMEOUT_MS },
       );
       if (installed.exitCode !== 0) {
         throw new Error(

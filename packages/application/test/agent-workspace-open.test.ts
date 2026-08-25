@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { InMemoryOccupancyAgentRepository } from "../src/occupancy-agent";
 
 import { describe, expect, test } from "bun:test";
 import { domainError, err, ok } from "@appaloft/core";
@@ -873,9 +874,12 @@ describe("Agent Workspace open application workflow", () => {
     expect(opened.isOk()).toBe(true);
     expect(opened._unsafeUnwrap()).toMatchObject({
       workspaceId: "sbx_notes",
+      name: "resonant-silence",
+      agentId: "agt_notes",
       resumed: false,
       source: { repositoryIdentity: "folder.local/cwd/notes" },
     });
+
     expect(executedCommands).toEqual([]);
     expect(executedCommands.some((argv) => argv.includes("fetch"))).toBe(false);
     expect(executedCommands.some((argv) => argv.includes("clone"))).toBe(false);
@@ -1297,8 +1301,10 @@ function createFolderOccupancyOpen(options: {
       consume: async () => ok(undefined),
       release: async () => ok(undefined),
     },
+    occupancyAgents: new InMemoryOccupancyAgentRepository(() => "agt_notes"),
     now: () => "2026-08-20T00:00:00.000Z",
   };
+
   return {
     service: new AgentWorkspaceOpenService(dependencies),
     sourceCredentials,

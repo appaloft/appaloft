@@ -338,7 +338,7 @@ describe("logged-in folder.local remote occupy", () => {
     expect(createBody).not.toHaveProperty("repository");
     expect(captured.text).toContain("Choosing this folder…");
     expect(captured.text).toContain("Using this project…");
-    expect(captured.text).toContain("Preparing disk on hostinger…");
+    expect(captured.text).toContain("Waking the agent…");
     expect(captured.text).not.toContain("Choosing occupancy");
     expect(captured.text).not.toContain("Opening occupancy");
     expect(captured.text).not.toContain("workspace_open_source_materialization_failed");
@@ -668,7 +668,7 @@ describe("logged-in folder.local remote occupy", () => {
       ?.clone()
       .json()) as { readonly harnessKey?: string };
     expect(runtimeBody.harnessKey).toBe("pi");
-    expect(captured.text).toContain("Preparing disk on hostinger…");
+    expect(captured.text).toContain("Waking the agent…");
     expect(captured.text).not.toContain("This Cloud does not accept Server targeting");
     expect(captured.text).not.toContain("Deploy a Cloud that accepts workspaces.open");
     expect(captured.text.toLowerCase()).not.toContain("occupancy");

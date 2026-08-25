@@ -6,20 +6,21 @@ export type OccupancyPrepareStepId = (typeof OCCUPANCY_PREPARE_STEP_IDS)[number]
 
 export const OCCUPANCY_CODE_PROGRESS = {
   connecting: "Checking credentials…",
-  checkingLogin: "Checking login…",
+  checkingLogin: "Loading your project…",
   lookingUpServers: "Looking up enrolled servers…",
   choosingOccupancy: "Choosing this folder…",
   usingThisProject: "Using this project…",
   resolvingRepository: "Resolving repository…",
-  copyingSkills: "Preparing skills…",
-  copyingCredentials: "Preparing credentials…",
-  attaching: "Attaching…",
+  openingAgent: "Waking the agent…",
+  copyingSkills: "Including your skills…",
+  copyingCredentials: "Using your credential on the agent…",
+  attaching: "Finalizing configuration…",
 } as const;
 
 export const OCCUPANCY_PREPARE_STEP_LABELS = {
-  credential: "Checking login",
-  skills: "Preparing skills",
-  disk: "Preparing disk",
+  credential: "Using your credential on the agent",
+  skills: "Including your skills",
+  disk: "Waking the agent",
 } as const;
 
 export function occupancyCodeUsesLineProgress(input: {
@@ -63,14 +64,17 @@ export async function settleWithTimeout<T>(
 }
 
 export function occupancyOpeningProgress(serverName: string): string {
-  const name = serverName.trim() || "the enrolled server";
-  return `Preparing disk on ${name}…`;
+  void serverName;
+  return "Waking the agent…";
 }
 
-export function occupancyPrepareStepForProgress(message: string): OccupancyPrepareStepId {
+export function occupancyPrepareStepForProgress(
+  message: string,
+): OccupancyPrepareStepId | undefined {
   if (/skill/iu.test(message)) return "skills";
-  if (/login|server|credential/iu.test(message)) return "credential";
-  return "disk";
+  if (/Using your|credential|OpenCode login/iu.test(message)) return "credential";
+  if (/Waking|Woke|Finalizing|work is on its disk|preparing disk/iu.test(message)) return "disk";
+  return undefined;
 }
 
 export function occupancyChromeHasForbiddenWord(text: string): boolean {

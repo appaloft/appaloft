@@ -94,11 +94,11 @@ import {
   DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
   OCCUPANCY_CODE_PROGRESS,
   occupancyCodeUsesLineProgress,
-  occupancyOpeningProgress,
   occupancyTimeoutMs,
   reportOccupancyCodeProgress,
   settleWithTimeout,
 } from "../occupancy-code-progress.js";
+import { occupancyAgentWakeLine } from "../occupancy-agent-name.js";
 import { offerOccupancyConnectingMaterials } from "../occupancy-connecting-offer.js";
 import {
   occupancyConnectingStepLines,
@@ -658,6 +658,13 @@ function occupancyCodeProfile(harness: OccupancyHarness, profile?: string): stri
   return undefined;
 }
 
+function occupancyOpenRuntimeId(result: {
+  readonly agent?: { readonly runtimeId?: string };
+  readonly attach?: { readonly runtimeId?: string };
+}): string | undefined {
+  return result.agent?.runtimeId ?? result.attach?.runtimeId;
+}
+
 export const workspaceCodeCommand = EffectCommand.make(
   "code",
   {
@@ -825,6 +832,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           readonly announcePin?: boolean;
           readonly keepRetryingTransientDisk?: boolean;
           readonly signal?: AbortSignal;
+          readonly attach?: boolean;
         },
       ) => {
         const explicitServerId = optionalValue(server);
@@ -930,7 +938,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           branch: door.branch,
           commitSha: door.commitSha,
           targetServerId: door.serverId,
-          attach,
+          attach: options?.attach ?? attach,
           forceNew,
           ...(selectedProfile ? { profile: selectedProfile } : {}),
           ...(door.projectId && door.projectId !== "project" ? { projectId: door.projectId } : {}),
@@ -940,7 +948,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         if (door.projectId && door.projectId !== "project") {
           onProgress(OCCUPANCY_CODE_PROGRESS.usingThisProject);
         }
-        onProgress(occupancyOpeningProgress(door.serverName));
+        onProgress(OCCUPANCY_CODE_PROGRESS.openingAgent);
         // folder.local occupy executes OpenAgentWorkspaceCommand through
         // executeFolderLocalWorkspaceOpen → createRemoteSandbox (sandboxes.create).
         const occupyAttemptTimeoutMs = occupyDiskGatewayAttemptTimeoutMs(
@@ -959,7 +967,7 @@ export const workspaceCodeCommand = EffectCommand.make(
               : {}),
             ...(options?.signal ? { signal: options.signal } : {}),
             onRetry: () => {
-              onProgress(occupancyOpeningProgress(door.serverName), { status: "retrying" });
+              onProgress(OCCUPANCY_CODE_PROGRESS.openingAgent, { status: "retrying" });
             },
           });
         let openForCloud = openInput;
@@ -1080,12 +1088,10 @@ export const workspaceCodeCommand = EffectCommand.make(
                     announcePin: false,
                     keepRetryingTransientDisk: true,
                     signal,
+                    attach: false,
                   },
                 );
-                if (!occupied.result.attach) {
-                  throw occupyLiveSessionMissingError();
-                }
-                await settleWithTimeout(
+                const materials = await settleWithTimeout(
                   offerOccupancyConnectingMaterials({
                     workspaceId: occupied.result.workspaceId,
                     harness: selectedHarness,
@@ -1100,7 +1106,7 @@ export const workspaceCodeCommand = EffectCommand.make(
                     DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
                   ),
                 );
-                void settleWithTimeout(
+                await settleWithTimeout(
                   (async () => {
                     await tuiProgress(OCCUPANCY_CODE_PROGRESS.copyingSkills);
                     try {
@@ -1125,9 +1131,52 @@ export const workspaceCodeCommand = EffectCommand.make(
                     DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
                   ),
                 );
+                const persistedAgentName = occupied.result.name?.trim();
+                if (persistedAgentName) {
+                  await tuiProgress(occupancyAgentWakeLine(persistedAgentName));
+                }
+                const connecting = occupancyConnectingTelemetry({
+                  harness: selectedHarness,
+                  skillCount: 0,
+                  firstPartyMcp:
+                    materials.status === "completed" ? materials.value.mcp.firstParty : false,
+                  ...(persistedAgentName ? { agentName: persistedAgentName } : {}),
+                  ...(occupancyVendor.vendor ? { vendor: occupancyVendor.vendor } : {}),
+                  ...(materials.status === "completed" && materials.value.credential
+                    ? { credential: materials.value.credential }
+                    : {}),
+                });
+                for (const line of occupancyConnectingStepLines(connecting)) {
+                  await tuiProgress(line);
+                }
+                let runtimeId = occupancyOpenRuntimeId(occupied.result);
+                if (!runtimeId) {
+                  const listedQuery = ListSandboxAgentRuntimesQuery.create({
+                    sandboxId: occupied.result.workspaceId,
+                  });
+                  if (listedQuery.isOk()) {
+                    const listed = await cli.executeQuery(listedQuery.value);
+                    if (listed.isOk()) {
+                      const items =
+                        (listed.value as { items?: Array<{ runtimeId?: string }> }).items ?? [];
+                      runtimeId = items[0]?.runtimeId;
+                    }
+                  }
+                }
+                if (!runtimeId) {
+                  throw occupyLiveSessionMissingError();
+                }
+                const attachCommand = IssueSandboxAgentAttachAccessCommand.create({
+                  sandboxId: occupied.result.workspaceId,
+                  runtimeId,
+                  expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+                });
+                if (attachCommand.isErr()) throw attachCommand.error;
+                const issued = await cli.executeCommand(attachCommand.value);
+                if (issued.isErr()) throw issued.error;
                 return {
                   workspaceId: occupied.result.workspaceId,
-                  ...(occupied.result.attach ? { attach: occupied.result.attach } : {}),
+                  attach: issued.value as NonNullable<(typeof occupied.result)["attach"]>,
                   ...(occupied.door.projectName ? { projectName: occupied.door.projectName } : {}),
                 };
               },
@@ -1215,11 +1264,11 @@ export const workspaceCodeCommand = EffectCommand.make(
       const reportConnectingSteps = (
         materials: Awaited<ReturnType<typeof offerConnectingMaterials>>,
       ) => {
-        if (!noAttach || !lineProgress) return;
         const telemetry = occupancyConnectingTelemetry({
           harness: selectedHarness,
           skillCount: copiedSkillCount,
           firstPartyMcp: materials?.mcp.firstParty ?? false,
+          ...(result.name?.trim() ? { agentName: result.name.trim() } : {}),
           ...(occupancyVendor.vendor ? { vendor: occupancyVendor.vendor } : {}),
           ...(materials?.credential ? { credential: materials.credential } : {}),
         });

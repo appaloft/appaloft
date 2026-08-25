@@ -750,6 +750,45 @@ describe("remote code door", () => {
     });
   });
 
+  test("[FOLDER-ONBOARD-010] git cwd prefers onboarding Project over a leftover Binding", async () => {
+    await withThisFolderGitWorktree(async (gitDir) => {
+      let onboarded = false;
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: gitDir,
+          listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+          resolveLocator: async () => ({
+            repository: "https://github.com/appaloft/appaloft-cloud.git",
+            repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+            ref: "refs/heads/main",
+            branch: "main",
+          }),
+          ensureFolderOnboarding: async () => {
+            onboarded = true;
+            return {
+              projectId: "prj_created",
+              projectName: "appaloft-cloud",
+              identity: "github.com/appaloft/appaloft-cloud",
+              created: true,
+              reused: false,
+            };
+          },
+          showBinding: async () => ({ projectId: "prj_deleted", status: "active" }),
+          resolveRemoteRef: async () => ({
+            repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+            credentialFreeHttpsRepository: "https://github.com/appaloft/appaloft-cloud.git",
+            ref: "refs/heads/main",
+            commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          }),
+        },
+        gitDir,
+      );
+      expect(onboarded).toBe(true);
+      expect(door.projectId).toBe("prj_created");
+    });
+  });
+
   test("[FOLDER-ONBOARD-007] folder.local banner prefers the current-folder door project", () => {
     expect(
       remoteOccupyBannerProjectId({

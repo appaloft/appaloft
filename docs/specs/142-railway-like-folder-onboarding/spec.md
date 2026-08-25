@@ -34,7 +34,10 @@ linked project is one command.
 4. Linked folder: reuse the persisted project id after `projects.show` confirms
    it is still active.
 5. Cwd with `origin`: identity is that remote. Find-or-create the matching
-   Project (active repository binding, then same name, else create).
+   Project (active repository binding whose Project is still active, then same
+   name, else create). A leftover binding to a deleted or inactive Project is
+   treated as unbound. TTY `code` with the pre-TUI inquire policy still
+   inquires before creating.
 6. Cwd without git: identity is `folder.local/cwd/<sanitized-dirname>`. Occupy
    and deploy still succeed.
 7. `appaloft project use <projectId>` writes the folder link after `projects.show`.
