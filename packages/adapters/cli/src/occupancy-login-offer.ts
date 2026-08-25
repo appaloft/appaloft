@@ -24,6 +24,20 @@ export interface OccupancyAppaloftLogin {
   };
 }
 
+export function occupancyControlPlaneMcpUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/mcp`;
+}
+
+export function occupancyMcpAuthHeader(auth: CliControlPlaneAuth): {
+  readonly name: "Authorization" | "Cookie";
+  readonly value: string;
+} {
+  if (auth.kind === "bearer") {
+    return { name: "Authorization", value: `Bearer ${auth.token}` };
+  }
+  return { name: "Cookie", value: auth.cookie };
+}
+
 export function occupancyAppaloftProfilesJson(login: OccupancyAppaloftLogin): string {
   return `${JSON.stringify(
     {

@@ -116,6 +116,7 @@ export async function offerOccupancyConnectingMaterials(input: {
     workspaceId: input.workspaceId,
     executeCommand: writeOnly,
     destinationExists,
+    ...(login.login ? { login: login.login } : {}),
     ...(input.projectName ? { projectName: input.projectName } : {}),
     ...(input.projectId ? { projectId: input.projectId } : {}),
     ...(input.resources ? { resources: input.resources } : {}),

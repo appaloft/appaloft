@@ -31,7 +31,7 @@ test("[WS-REMOTE-MCP-237] occupancy writes Grok/Codex/Claude MCP launchers", asy
   expect(grok).toBeDefined();
   if (!grok) return;
   expect(Buffer.from(String(grok.input.contentBase64), "base64").toString("utf8")).toContain(
-    "[mcp_servers.appaloft]",
+    'command = "/usr/local/bin/appaloft"',
   );
   expect(Buffer.from(String(grok.input.contentBase64), "base64").toString("utf8")).not.toMatch(
     /token|secret|sk-/i,
@@ -73,4 +73,30 @@ test("[WS-REMOTE-MCP-238] occupancy writes Project context, not git-as-project",
   expect(occupancyProjectContextMarkdown({ projectName: "only" })).toContain(
     "Do not answer from git remotes alone",
   );
+});
+
+test("[WS-REMOTE-MCP-244] occupancy login writes HTTP MCP so Grok does not need a local CLI", async () => {
+  const commands: WriteSandboxFileCommand[] = [];
+  await offerOccupancyFirstPartyMcp({
+    workspaceId: "sbx_ready",
+    login: {
+      name: "cloud",
+      mode: "cloud",
+      baseUrl: "https://app.appaloft.com",
+      auth: { kind: "bearer", token: "occ_login_token" },
+      createdAt: "2026-08-25T00:00:00.000Z",
+      updatedAt: "2026-08-25T00:00:00.000Z",
+    },
+    executeCommand: async (command) => {
+      commands.push(command);
+      return ok({});
+    },
+  });
+  const grok = commands.find((command) => command.input.path === ".grok/config.toml");
+  expect(grok).toBeDefined();
+  if (!grok) return;
+  const toml = Buffer.from(String(grok.input.contentBase64), "base64").toString("utf8");
+  expect(toml).toContain('url = "https://app.appaloft.com/mcp"');
+  expect(toml).toContain('Authorization = "Bearer occ_login_token"');
+  expect(toml).not.toContain("command =");
 });

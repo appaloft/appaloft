@@ -66,10 +66,7 @@ test("[WS-REMOTE-MCP-241] connecting offer logs login without leaking the token"
   expect(grok).toBeDefined();
   if (!grok) return;
   expect(Buffer.from(String(grok.input.contentBase64), "base64").toString("utf8")).toContain(
-    'command = "appaloft"',
-  );
-  expect(Buffer.from(String(grok.input.contentBase64), "base64").toString("utf8")).not.toContain(
-    "occ_login_token",
+    'url = "https://app.appaloft.com/mcp"',
   );
   expect(JSON.stringify(telemetry)).not.toContain("occ_login_token");
 });
