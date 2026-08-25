@@ -16,7 +16,6 @@ export interface FolderLocalResume {
   readonly updatedAt: string;
 }
 
-
 export interface FolderLocalResumeStoreData {
   readonly schemaVersion: typeof FOLDER_LOCAL_RESUME_SCHEMA_VERSION;
   readonly items: Readonly<Record<string, FolderLocalResume>>;
@@ -78,7 +77,6 @@ function parseResume(value: unknown): FolderLocalResume | undefined {
     ...(targetServerId ? { targetServerId } : {}),
     ...(profile ? { profile } : {}),
   };
-
 }
 
 function parseStore(value: unknown): FolderLocalResumeStoreData {

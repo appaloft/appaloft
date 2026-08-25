@@ -164,7 +164,6 @@ describe("CLI safe error evidence", () => {
     expect(output).toContain("Occupancy omp download failed: HTTP 403");
   });
 
-
   test("[WS-REMOTE-OPEN-CAUSE-180] human and safe-json keep workspace open cause and repository", () => {
     const error: DomainError = {
       code: "conflict",

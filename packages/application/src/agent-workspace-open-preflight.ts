@@ -253,9 +253,7 @@ export class AgentWorkspaceOpenPreflightService {
     }
     const reread = await this.resolveCanonicalContext(
       context,
-      initialized.value.projectId
-        ? { ...input, projectId: initialized.value.projectId }
-        : input,
+      initialized.value.projectId ? { ...input, projectId: initialized.value.projectId } : input,
       initialized.value,
     );
     if (reread.isOk()) return reread;

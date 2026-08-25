@@ -1,7 +1,6 @@
 import "reflect-metadata";
 import { InMemoryOccupancyAgentRepository } from "../src/occupancy-agent";
 
-
 import { describe, expect, test } from "bun:test";
 import { domainError, err, ok } from "@appaloft/core";
 

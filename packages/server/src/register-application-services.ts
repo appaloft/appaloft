@@ -762,7 +762,6 @@ import {
   type WorkspaceOpenCredentialAdmissionPort,
   type WorkspaceOpenEntryRepository,
   type OccupancyAgentRepository,
-
   type WorkspaceOpenMcpAdmissionPort,
   type WorkspaceOpenPlacementPort,
   type WorkspaceOpenSourceCredentialProviderPort,

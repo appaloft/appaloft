@@ -32,10 +32,7 @@ describe("OccupancyAgent persistence", () => {
     try {
       expect((await createMigrator(database.db).migrateToLatest()).error).toBeUndefined();
       let sequence = 0;
-      const agents = new PgOccupancyAgentRepository(
-        database.db,
-        () => `agt_${++sequence}`,
-      );
+      const agents = new PgOccupancyAgentRepository(database.db, () => `agt_${++sequence}`);
       const created = await agents.occupy({
         ...key,
         sandboxId: "sbx_one",
@@ -76,10 +73,7 @@ describe("OccupancyAgent persistence", () => {
     try {
       expect((await createMigrator(database.db).migrateToLatest()).error).toBeUndefined();
       let sequence = 0;
-      const agents = new PgOccupancyAgentRepository(
-        database.db,
-        () => `agt_${++sequence}`,
-      );
+      const agents = new PgOccupancyAgentRepository(database.db, () => `agt_${++sequence}`);
       await agents.occupy({
         ...key,
         sandboxId: "sbx_one",

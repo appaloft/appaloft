@@ -103,12 +103,12 @@ test("[WS-REMOTE-VENDOR-204] Claude Codex Grok and omp occupy reserved images wi
     templateId: COMMUNITY_OCCUPANCY_GROK_TEMPLATE_ID,
     image: COMMUNITY_OCCUPANCY_GROK_IMAGE,
   });
-  expect(
-    communityOccupancyReservedTemplateSpec(COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID),
-  ).toMatchObject({
-    templateId: COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
-    image: COMMUNITY_OCCUPANCY_OMP_IMAGE,
-  });
+  expect(communityOccupancyReservedTemplateSpec(COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID)).toMatchObject(
+    {
+      templateId: COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
+      image: COMMUNITY_OCCUPANCY_OMP_IMAGE,
+    },
+  );
   expect(COMMUNITY_OCCUPANCY_CLAUDE_IMAGE).toContain(COMMUNITY_OCCUPANCY_CLAUDE_VERSION);
   expect(COMMUNITY_OCCUPANCY_CODEX_IMAGE).toContain(COMMUNITY_OCCUPANCY_CODEX_VERSION);
   expect(COMMUNITY_OCCUPANCY_GROK_IMAGE).toContain(COMMUNITY_OCCUPANCY_GROK_VERSION);

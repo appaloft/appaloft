@@ -355,7 +355,6 @@ class StaticMigrationProvider implements MigrationProvider {
       "121_source_event_required_check_deliveries": sourceEventRequiredCheckDeliveriesMigration,
       "122_repository_binding_per_project": repositoryBindingPerProjectMigration,
       "123_occupancy_agents": occupancyAgentsMigration,
-
     };
   }
 }

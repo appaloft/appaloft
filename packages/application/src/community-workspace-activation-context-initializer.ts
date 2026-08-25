@@ -32,7 +32,11 @@ import {
 import { selectWorkspaceProfileInstallation } from "./agent-workspace-profile-selector";
 import { COMMUNITY_OCCUPANCY_OPENCODE_PROFILE_ID } from "./community-occupancy-pi-template";
 import { type CommandBus } from "./cqrs";
-import { type ExecutionContext, type RepositoryContext, toRepositoryContext } from "./execution-context";
+import {
+  type ExecutionContext,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "./execution-context";
 import { CreateEnvironmentCommand } from "./operations/environments/create-environment.command";
 import { ConfigureProjectWorkspaceProfileCommand } from "./operations/projects/configure-project-workspace-profile.command";
 import { CreateProjectCommand } from "./operations/projects/create-project.command";
@@ -45,7 +49,10 @@ import {
   type SourceDetector,
 } from "./ports";
 import { type RepositoryBindingRepository } from "./repository-binding";
-import { BindProjectRepositoryCommand, UnbindRepositoryCommand } from "./repository-binding-messages";
+import {
+  BindProjectRepositoryCommand,
+  UnbindRepositoryCommand,
+} from "./repository-binding-messages";
 
 export interface CommunityRemoteWorkspaceDefaultProfileConfig {
   readonly adapterManifest: unknown;
@@ -326,9 +333,7 @@ export class CommunityWorkspaceActivationContextInitializer implements Workspace
     }
     const command = CreateProjectCommand.create({
       name: name.value.value,
-      ...(context.tenant?.organizationId
-        ? { organizationId: context.tenant.organizationId }
-        : {}),
+      ...(context.tenant?.organizationId ? { organizationId: context.tenant.organizationId } : {}),
     });
     if (command.isErr()) return err(command.error);
     const created = await this.dependencies.commandBus.execute(context, command.value);
@@ -344,7 +349,6 @@ export class CommunityWorkspaceActivationContextInitializer implements Workspace
     }
     return err(created.error);
   }
-
 
   private async findEnabledInstallationForSelector(
     context: ExecutionContext,

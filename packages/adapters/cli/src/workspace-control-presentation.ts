@@ -1156,7 +1156,6 @@ export function createBoundedWorkspaceControlPresentation(
               } else if (frame.kind === "error") {
                 await renderer.send(safeError(frame.error, "workspace-control-terminal"));
               }
-
             }
           } catch (error) {
             await sendErrorBestEffort(error, "workspace-control-terminal");

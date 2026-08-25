@@ -996,8 +996,7 @@ describe("Community occupancy initializer", () => {
           _context: unknown,
           _identity: string,
           projectId: string,
-        ) =>
-          binding?.binding.toState().projectId.value === projectId ? binding : null,
+        ) => (binding?.binding.toState().projectId.value === projectId ? binding : null),
         save: async () => undefined,
       } as never,
       adapters: {
@@ -1035,8 +1034,6 @@ describe("Community occupancy initializer", () => {
     expect(result.value.projectId).toBe("prj_new");
     expect(executed.some((command) => command instanceof CreateProjectCommand)).toBe(true);
     expect(executed.some((command) => command instanceof UnbindRepositoryCommand)).toBe(true);
-    expect(executed.some((command) => command instanceof BindProjectRepositoryCommand)).toBe(
-      true,
-    );
+    expect(executed.some((command) => command instanceof BindProjectRepositoryCommand)).toBe(true);
   });
 });

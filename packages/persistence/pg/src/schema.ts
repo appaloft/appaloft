@@ -1666,7 +1666,6 @@ export interface OccupancyAgentsTable {
   updated_at: UpdatableTimestampColumn;
 }
 
-
 export interface AgentWorkspaceProfileReferencesTable {
   tenant_id: string;
   installation_id: string;

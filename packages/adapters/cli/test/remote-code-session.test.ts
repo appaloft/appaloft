@@ -789,7 +789,6 @@ describe("remote code door", () => {
     });
   });
 
-
   test("[FOLDER-ONBOARD-007] folder.local banner prefers the current-folder door project", () => {
     expect(
       remoteOccupyBannerProjectId({

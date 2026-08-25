@@ -28,7 +28,6 @@ import {
   createExecutionContext,
   IssueSandboxAgentAttachAccessCommand,
   InMemoryOccupancyAgentRepository,
-
   ListProjectsQuery,
   ListSandboxesQuery,
   ListServersQuery,
@@ -281,7 +280,6 @@ export async function executeFolderLocalWorkspaceOpen(input: {
         },
         resumeStore,
       );
-
     } catch {
       // Resume cache is an accelerator. Occupy already succeeded.
     }

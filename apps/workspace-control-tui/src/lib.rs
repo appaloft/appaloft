@@ -1019,7 +1019,6 @@ fn apply_prepare_step(
     }
 }
 
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct OccupancyLoading {
     pub active: bool,
@@ -1084,7 +1083,6 @@ pub struct AppState {
     pub occupancy_surface: bool,
     pub entered_from_home: bool,
 
-
     pub open_panes: Vec<OpenPane>,
     pub pending_osc52: Vec<String>,
     pub osc52_carry: String,
@@ -1125,7 +1123,6 @@ impl Default for AppState {
             home: HomeState::default(),
             occupancy_surface: false,
             entered_from_home: false,
-
 
             open_panes: Vec::new(),
             pending_osc52: Vec::new(),
@@ -1189,9 +1186,9 @@ impl AppState {
                 status,
             } => {
                 self.loading.active = true;
-                if let Some(step_id) = step.or_else(|| {
-                    infer_prepare_step_id(&message).map(str::to_owned)
-                }) {
+                if let Some(step_id) =
+                    step.or_else(|| infer_prepare_step_id(&message).map(str::to_owned))
+                {
                     apply_prepare_step(
                         &mut self.loading.steps,
                         &step_id,
@@ -1242,7 +1239,6 @@ impl AppState {
                     self.loading.active = false;
                     self.home.error = None;
                 }
-
 
                 if !vendors.is_empty() {
                     self.home.apply_vendors(vendors, selected_vendor.as_deref());
@@ -1333,7 +1329,6 @@ impl AppState {
                     };
                 }
             }
-
 
             ParentMessage::DeliveryComplete { workspace_id } => {
                 self.delivery_busy = false;
@@ -1427,7 +1422,6 @@ impl AppState {
         self.help_open = false;
         self.status_line = "Appaloft Cloud Agents".to_owned();
     }
-
 
     fn remember_open_pane(&mut self, workspace_id: &str, runtime_id: &str, session_id: &str) {
         if let Some(existing) = self
@@ -2240,7 +2234,6 @@ pub fn encode_agent_key_burst(keys: impl IntoIterator<Item = KeyEvent>) -> Strin
         .collect()
 }
 
-
 pub fn terminal_key_bytes(key: KeyEvent) -> Option<String> {
     if key.modifiers.contains(KeyModifiers::CONTROL)
         && let KeyCode::Char(character) = key.code
@@ -2744,9 +2737,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         );
         return;
     }
-    if (state.home.visible || state.occupancy_surface)
-        && !state.agent_focused
-        && !state.focus_mode
+    if (state.home.visible || state.occupancy_surface) && !state.agent_focused && !state.focus_mode
     {
         render_occupancy_home(frame, &state.home, body);
         frame.render_widget(
@@ -4254,8 +4245,16 @@ mod tests {
             !failed.lines().any(line_clips_agents_title),
             "title must not clip to Appaloft Cloud Agen:\n{failed}"
         );
-        assert_eq!(failed.matches("Using your credential on the agent").count(), 1, "{failed}");
-        assert_eq!(failed.matches("Including your skills").count(), 1, "{failed}");
+        assert_eq!(
+            failed.matches("Using your credential on the agent").count(),
+            1,
+            "{failed}"
+        );
+        assert_eq!(
+            failed.matches("Including your skills").count(),
+            1,
+            "{failed}"
+        );
         assert_eq!(failed.matches("Waking the agent").count(), 1, "{failed}");
         assert!(failed.contains('!'), "{failed}");
         assert!(
@@ -4530,9 +4529,7 @@ mod tests {
             mouse.clone()
         ]));
         assert!(!drop_mouse_when_typing(&[mouse]));
-
     }
-
 
     #[test]
     fn code_tui_ca_keys_map_sleep_wake_delete_and_say_unavailable() {
@@ -5796,5 +5793,4 @@ mod tests {
         assert!(!out.contains("What should we build today?"), "{out}");
         assert!(!out.contains("New Session"), "{out}");
     }
-
 }

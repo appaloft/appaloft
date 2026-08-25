@@ -265,7 +265,6 @@ import {
   PgWorkspaceCollaborationRepository,
   PgWorkspaceOpenEntryRepository,
   PgOccupancyAgentRepository,
-
 } from "@appaloft/persistence-pg";
 import { createBuiltinPlugins } from "@appaloft/plugin-builtins";
 import { LocalPluginHost } from "@appaloft/plugin-host";
@@ -1251,12 +1250,12 @@ export function registerRuntimeDependencies(
   container.register(tokens.occupancyAgentRepository, {
     useFactory: instanceCachingFactory(
       () =>
-        new PgOccupancyAgentRepository(input.database.db, (prefix) =>
-          `${prefix}_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`,
+        new PgOccupancyAgentRepository(
+          input.database.db,
+          (prefix) => `${prefix}_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`,
         ),
     ),
   });
-
 
   container.register(tokens.sandboxRepository, {
     useFactory: instanceCachingFactory(() => new PgExecutionSandboxRepository(input.database.db)),

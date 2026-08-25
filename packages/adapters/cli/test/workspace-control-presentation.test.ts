@@ -3139,8 +3139,7 @@ describe("Workspace control presentation", () => {
       for (let attempt = 0; attempt < 80; attempt += 1) {
         if (
           this.messages.some(
-            (message) =>
-              message.type === "progress" && message.message === "Waking the agent…",
+            (message) => message.type === "progress" && message.message === "Waking the agent…",
           )
         ) {
           break;
@@ -3293,5 +3292,4 @@ describe("Workspace control presentation", () => {
     ).toBe(false);
     expect(renderer.messages.some((message) => message.type === "terminal-closed")).toBe(false);
   });
-
 });

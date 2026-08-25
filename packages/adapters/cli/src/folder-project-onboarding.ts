@@ -134,7 +134,6 @@ function installImmediateCancel(): () => void {
   };
 }
 
-
 export function withImmediateInquireCancel<A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, R> {

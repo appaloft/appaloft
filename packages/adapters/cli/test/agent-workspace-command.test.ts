@@ -19,7 +19,6 @@ import {
   CreateWorkspaceCollaborationCommand,
   createExecutionContext,
   InMemoryOccupancyAgentRepository,
-
   DeliverAgentTaskRunCommand,
   ExecuteSandboxCommand,
   type ExecutionContextFactory,
@@ -2892,8 +2891,12 @@ describe("Agent Workspace CLI", () => {
     await writeFile(join(homeDir, ".grok", "auth.json"), '{"access_token":"grok-secret"}\n');
     const commands: Command<unknown>[] = [];
     const { createCliProgram } = await import("../src");
-    const { ExecuteSandboxCommand, IssueSandboxAgentAttachAccessCommand, OpenAgentWorkspaceCommand, WriteSandboxFileCommand } =
-      await import("@appaloft/application");
+    const {
+      ExecuteSandboxCommand,
+      IssueSandboxAgentAttachAccessCommand,
+      OpenAgentWorkspaceCommand,
+      WriteSandboxFileCommand,
+    } = await import("@appaloft/application");
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
@@ -2925,7 +2928,9 @@ describe("Agent Workspace CLI", () => {
           return ok({} as T);
         },
       } as unknown as CommandBus,
-      queryBus: { execute: async () => err({ message: "missing" } as never) } as unknown as QueryBus,
+      queryBus: {
+        execute: async () => err({ message: "missing" } as never),
+      } as unknown as QueryBus,
       executionContextFactory: {
         create: (input) => createExecutionContext({ ...input, requestId: "req_grok_auth_first" }),
       },
@@ -2977,7 +2982,6 @@ describe("Agent Workspace CLI", () => {
     ).toBe(true);
     expect(JSON.stringify(commands)).not.toContain("grok-secret");
   });
-
 
   test("[MW-CP-DOOR-012][R8-OCC-CODE-008] code replaces a SHA-pinned occupancy with the requested commit", async () => {
     const commands: Command<unknown>[] = [];
@@ -3264,9 +3268,7 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain(
       "Remote · agent api@aaaaaaa · github.com/acme/api@aaaaaaa · hostinger · prj_web",
     );
-    expect(printed.indexOf("Waking the agent…")).toBeLessThan(
-      printed.indexOf("Remote ·"),
-    );
+    expect(printed.indexOf("Waking the agent…")).toBeLessThan(printed.indexOf("Remote ·"));
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Including your skills…"));
   });
 
@@ -3484,9 +3486,7 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain(
       "Remote · agent api@aaaaaaa · github.com/acme/api@aaaaaaa · hostinger · prj_web",
     );
-    expect(printed.indexOf("Waking the agent…")).toBeLessThan(
-      printed.indexOf("Remote ·"),
-    );
+    expect(printed.indexOf("Waking the agent…")).toBeLessThan(printed.indexOf("Remote ·"));
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Finalizing configuration…"));
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Including your skills…"));
   });
@@ -3660,7 +3660,7 @@ describe("Agent Workspace CLI", () => {
     ).text();
     expect(onboarding).toContain("quitCodeSessionOnCancel");
     expect(onboarding).toContain("restoreWorkspaceTuiScrollback");
-    expect(onboarding).not.toContain("stdin.on(\"data\"");
+    expect(onboarding).not.toContain('stdin.on("data"');
 
     const inquireAt = source.indexOf('promptPolicy: "pre-tui-inquire"');
     const tuiBlockStart = source.indexOf("if (useOccupancyTui && occupancyTui)");
@@ -5842,7 +5842,6 @@ function createCliFolderOccupancyOpen(options: {
       },
       occupancyAgents: new InMemoryOccupancyAgentRepository(() => "agt_notes"),
       now: () => "2026-08-20T00:00:00.000Z",
-
     }),
   };
 }

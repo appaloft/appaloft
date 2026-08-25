@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   pauseParentStdinForOccupancyTui,
-
   leaveWorkspaceTuiOnce,
   resetWorkspaceControlRendererWarmup,
   resetWorkspaceTuiScrollbackRestoreState,
@@ -411,5 +410,4 @@ describe("occupancy TUI slim launch", () => {
     release();
     expect(calls).toEqual(["pause", "raw:false", "pause"]);
   });
-
 });

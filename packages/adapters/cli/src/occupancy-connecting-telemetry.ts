@@ -51,10 +51,11 @@ export function occupancyConnectingSteps(input: {
   if (input.vendor && input.credentialOffered) {
     steps.push({
       id: "credential",
-      message: withPath(
-        `Using your ${OCCUPANCY_VENDOR_LABEL[input.vendor]} credential`,
-        input.credentialPath,
-      ) + " on the agent",
+      message:
+        withPath(
+          `Using your ${OCCUPANCY_VENDOR_LABEL[input.vendor]} credential`,
+          input.credentialPath,
+        ) + " on the agent",
     });
   } else if (input.opencodeConnectOffered) {
     steps.push({
@@ -69,9 +70,7 @@ export function occupancyConnectingSteps(input: {
   });
   steps.push({
     id: "disk",
-    message: input.agentName
-      ? occupancyAgentWokeLine(input.agentName)
-      : "your work is on its disk",
+    message: input.agentName ? occupancyAgentWokeLine(input.agentName) : "your work is on its disk",
   });
   return steps;
 }

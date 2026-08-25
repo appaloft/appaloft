@@ -27,7 +27,6 @@ export function pauseParentStdinForOccupancyTui(
   };
 }
 
-
 export interface WorkspaceControlRendererProcess {
   readonly exited: Promise<void>;
   terminate(): void;
@@ -584,7 +583,6 @@ export async function openLoopbackWorkspaceControlRenderer(
     await closeServer(server);
     throw error;
   }
-
 }
 
 function hasWorkspaceControlTuiCrate(root: string): boolean {

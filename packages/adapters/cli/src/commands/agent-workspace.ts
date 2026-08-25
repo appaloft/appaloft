@@ -665,7 +665,6 @@ function occupancyOpenRuntimeId(result: {
   return result.agent?.runtimeId ?? result.attach?.runtimeId;
 }
 
-
 export const workspaceCodeCommand = EffectCommand.make(
   "code",
   {

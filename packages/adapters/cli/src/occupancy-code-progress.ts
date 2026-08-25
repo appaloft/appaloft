@@ -68,7 +68,9 @@ export function occupancyOpeningProgress(serverName: string): string {
   return "Waking the agent…";
 }
 
-export function occupancyPrepareStepForProgress(message: string): OccupancyPrepareStepId | undefined {
+export function occupancyPrepareStepForProgress(
+  message: string,
+): OccupancyPrepareStepId | undefined {
   if (/skill/iu.test(message)) return "skills";
   if (/Using your|credential|OpenCode login/iu.test(message)) return "credential";
   if (/Waking|Woke|Finalizing|work is on its disk|preparing disk/iu.test(message)) return "disk";

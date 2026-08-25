@@ -36,7 +36,9 @@ describe("OccupancyAgent", () => {
     expect(agent.displayName().value).toBe("resonant-silence");
     expect(agent.sandboxId().value).toBe("sbx_one");
     expect(agent.toState().status.value).toBe("active");
-    expect(agent.pullDomainEvents().map((event) => event.type)).toEqual(["occupancy-agent-created"]);
+    expect(agent.pullDomainEvents().map((event) => event.type)).toEqual([
+      "occupancy-agent-created",
+    ]);
   });
 
   test("[WS-AGENT-ID-009] retarget keeps the Agent id and name when the Sandbox is replaced", () => {

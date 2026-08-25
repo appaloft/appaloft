@@ -116,4 +116,3 @@ export function occupancyAgentHandleFromState(agent: OccupancyAgent): OccupancyA
     sandboxId: agent.sandboxId().value,
   };
 }
-

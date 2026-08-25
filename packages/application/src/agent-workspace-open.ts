@@ -18,7 +18,6 @@ import {
 } from "./sandbox-agent-runtime";
 import { type OccupancyAgentRepository } from "./occupancy-agent";
 
-
 export interface WorkspaceOpenInput {
   readonly repository: string;
   readonly repositoryIdentity: string;
@@ -292,7 +291,6 @@ export interface WorkspaceOpenResult {
   readonly targetSelection: WorkspaceTargetSelectionEvidence;
   readonly attach?: SandboxAgentAttachDescriptor;
 }
-
 
 export interface SandboxOpenDescriptor {
   readonly sandboxId: string;
@@ -732,7 +730,6 @@ export class AgentWorkspaceOpenService {
           occupancy.value,
         ),
       );
-
     }
 
     const sourceCredentialResult =
@@ -1069,7 +1066,6 @@ export class AgentWorkspaceOpenService {
       }
       const occupancy = await this.occupyAgent(key, input, sandbox, options);
 
-
       if (occupancy.isErr()) throw occupancy.error;
       return ok(
         this.result(
@@ -1085,7 +1081,6 @@ export class AgentWorkspaceOpenService {
           occupancy.value,
         ),
       );
-
     } catch (cause) {
       const failure = isDomainError(cause)
         ? cause
@@ -1132,7 +1127,6 @@ export class AgentWorkspaceOpenService {
     });
   }
 
-
   private result(
     input: WorkspaceOpenInput,
     projectId: string,
@@ -1166,5 +1160,4 @@ export class AgentWorkspaceOpenService {
       ...(attach ? { attach } : {}),
     };
   }
-
 }

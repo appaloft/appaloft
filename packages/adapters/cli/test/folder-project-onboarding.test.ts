@@ -218,7 +218,6 @@ describe("folder project onboarding", () => {
     });
   });
 
-
   test("[FOLDER-ONBOARD-003] second command reuses the persisted folder link", async () => {
     const store = memoryFolderProjectLinkStore();
     const cwd = "/tmp/hello-static";
@@ -911,7 +910,6 @@ describe("folder project onboarding", () => {
       process.exit = originalExit;
     }
   });
-
 
   test("[FOLDER-ONBOARD-009] quitCodeSessionOnCancel leaves alt-screen before exit 130", () => {
     const restored: string[] = [];

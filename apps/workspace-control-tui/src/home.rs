@@ -197,7 +197,6 @@ impl HomeState {
             },
         }
     }
-
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
