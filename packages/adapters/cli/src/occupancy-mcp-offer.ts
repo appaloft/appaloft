@@ -3,6 +3,7 @@ import { type Result } from "@appaloft/core";
 
 export const OCCUPANCY_FIRST_PARTY_MCP_PATH = ".mcp.json";
 export const OCCUPANCY_PROJECT_CONTEXT_PATH = ".appaloft/project.md";
+export const OCCUPANCY_PROJECT_AGENT_FILES = ["AGENTS.md", "GROK.md"] as const;
 
 /**
  * Secret-free first-party Appaloft MCP for the occupancy disk.
@@ -113,24 +114,30 @@ export async function offerOccupancyFirstPartyMcp(input: {
       path: file.path,
       bytes: occupancyMcpFileBytes(file.kind),
       executeCommand: input.executeCommand,
-      ...(input.destinationExists ? { destinationExists: input.destinationExists } : {}),
     });
     if (wrote && file.path === OCCUPANCY_FIRST_PARTY_MCP_PATH) offered = true;
   }
   if (input.projectName || input.projectId) {
+    const markdown = occupancyProjectContextMarkdown({
+      ...(input.projectName ? { projectName: input.projectName } : {}),
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+      ...(input.resources ? { resources: input.resources } : {}),
+    });
+    const bytes = new TextEncoder().encode(markdown);
     await writeOccupancyFile({
       workspaceId: input.workspaceId,
       path: OCCUPANCY_PROJECT_CONTEXT_PATH,
-      bytes: new TextEncoder().encode(
-        occupancyProjectContextMarkdown({
-          ...(input.projectName ? { projectName: input.projectName } : {}),
-          ...(input.projectId ? { projectId: input.projectId } : {}),
-          ...(input.resources ? { resources: input.resources } : {}),
-        }),
-      ),
+      bytes,
       executeCommand: input.executeCommand,
-      ...(input.destinationExists ? { destinationExists: input.destinationExists } : {}),
     });
+    for (const path of OCCUPANCY_PROJECT_AGENT_FILES) {
+      await writeOccupancyFile({
+        workspaceId: input.workspaceId,
+        path,
+        bytes,
+        executeCommand: input.executeCommand,
+      });
+    }
   }
   return {
     offered,

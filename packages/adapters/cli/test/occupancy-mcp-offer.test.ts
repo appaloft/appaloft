@@ -44,6 +44,7 @@ test("[WS-REMOTE-MCP-238] occupancy writes Project context, not git-as-project",
     workspaceId: "sbx_ready",
     projectName: "drab-week",
     projectId: "prj_drab",
+    destinationExists: async () => true,
     resources: [
       { name: "undb", kind: "application", source: "git" },
       { name: "www", kind: "static-site", source: "git" },
@@ -53,7 +54,15 @@ test("[WS-REMOTE-MCP-238] occupancy writes Project context, not git-as-project",
       return ok({});
     },
   });
-  const context = commands.find((command) => command.input.path === OCCUPANCY_PROJECT_CONTEXT_PATH);
+  expect(commands.map((command) => command.input.path)).toEqual(
+    expect.arrayContaining([
+      OCCUPANCY_PROJECT_CONTEXT_PATH,
+      "AGENTS.md",
+      "GROK.md",
+      ".grok/config.toml",
+    ]),
+  );
+  const context = commands.find((command) => command.input.path === "AGENTS.md");
   expect(context).toBeDefined();
   if (!context) return;
   const markdown = Buffer.from(String(context.input.contentBase64), "base64").toString("utf8");

@@ -63,8 +63,9 @@ surface available in the session.
   my Sandbox. On a TTY it enters the occupancy Workspace TUI immediately with the
   list collapsed and a centered preparing-the-agent wait, then attaches. `--no-attach` and non-TTY keep one-line
   progress and the Remote banner. Skill copy is fail-soft and time-bounded.
-  Before answering “what project am I in?”, read `.appaloft/project.md` and call Appaloft MCP
-  (`projects_show`, `resources_list`) or `appaloft project show` / `appaloft resource list`.
+  Before answering “what project am I in?”, read `AGENTS.md` / `GROK.md` / `.appaloft/project.md`
+  and call Appaloft MCP (`projects_show`, `resources_list`) or `appaloft project show` / `appaloft resource list`.
+  Do not answer from git remotes or package.json alone. Occupy refreshes those files every time.
   Occupy copies the laptop Appaloft login onto `.appaloft/profiles.json`. The occupancy image ships the official `appaloft` CLI; vendor MCP is `appaloft mcp stdio`.
   The git remote is one Resource source, not the Project. A Project can have many Resources
   (git, static site, or Docker). From inside OpenCode, use first-party `appaloft-tools` to list/plan/create

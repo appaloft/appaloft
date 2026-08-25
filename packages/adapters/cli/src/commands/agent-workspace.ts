@@ -1136,7 +1136,7 @@ export const workspaceCodeCommand = EffectCommand.make(
                     DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
                   ),
                 );
-                await settleWithTimeout(
+                void settleWithTimeout(
                   (async () => {
                     await tuiProgress(OCCUPANCY_CODE_PROGRESS.copyingSkills);
                     try {
@@ -1258,6 +1258,12 @@ export const workspaceCodeCommand = EffectCommand.make(
             ...(occupancyVendor.vendor ? { vendor: occupancyVendor.vendor } : {}),
             ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
             ...(cli.environment ? { env: cli.environment } : {}),
+            ...(door.projectName ? { projectName: door.projectName } : {}),
+            ...(door.projectId && door.projectId !== "project"
+              ? { projectId: door.projectId }
+              : result.projectId
+                ? { projectId: result.projectId }
+                : {}),
           });
         } catch {
           return undefined;
