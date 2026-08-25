@@ -10,7 +10,7 @@ export const COMMUNITY_OCCUPANCY_OPENCODE_IMAGE =
 // contain this pin and then tries `bun add opencode-ai@<pin>` inside the Sandbox.
 export const COMMUNITY_OCCUPANCY_OPENCODE_VERSION = "1.18.4";
 export const COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST =
-  "sha256:27f7a3ca10124d922b35de64d17588278e5dc0d1db398d69ea5920f80e87a324";
+  "sha256:88b68a4f908cd8d1d890ee1857f60a1f3430582afb445f79cd7d6e2bb0420ae5";
 export const COMMUNITY_OCCUPANCY_OPENCODE_ISOLATION = "container-trusted" as const;
 export const COMMUNITY_OCCUPANCY_OPENCODE_LIMITS = {
   cpuMillis: 2_000,

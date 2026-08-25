@@ -27,21 +27,21 @@ export const COMMUNITY_OCCUPANCY_CLAUDE_TEMPLATE_NAME = "appaloft-remote-claude"
 export const COMMUNITY_OCCUPANCY_CLAUDE_IMAGE =
   "ghcr.io/appaloft/agent-workspace-occupancy-claude:2.1.199";
 export const COMMUNITY_OCCUPANCY_CLAUDE_TEMPLATE_DIGEST =
-  "sha256:47cafe5cfbdec7949275ad0f9b7458c7bbee2d1e1042bae5c2824eaf994ab30f";
+  "sha256:4b2252b3e8b3427bad8296ada13756c3365686b7cd0fc466fb273c285138bb96";
 
 export const COMMUNITY_OCCUPANCY_CODEX_TEMPLATE_ID = "stp_appaloft_remote_codex";
 export const COMMUNITY_OCCUPANCY_CODEX_TEMPLATE_NAME = "appaloft-remote-codex";
 export const COMMUNITY_OCCUPANCY_CODEX_IMAGE =
   "ghcr.io/appaloft/agent-workspace-occupancy-codex:0.149.0";
 export const COMMUNITY_OCCUPANCY_CODEX_TEMPLATE_DIGEST =
-  "sha256:51e1e66a5dd824938370fec142f5bd49ff0809898690edb9352c2f7a9651666e";
+  "sha256:26969e5146ee6fb4f6ffd9235b96db75518263fe3ad0a79de4dabeb123d502a9";
 
 export const COMMUNITY_OCCUPANCY_GROK_TEMPLATE_ID = "stp_appaloft_remote_grok";
 export const COMMUNITY_OCCUPANCY_GROK_TEMPLATE_NAME = "appaloft-remote-grok";
 export const COMMUNITY_OCCUPANCY_GROK_IMAGE =
   "ghcr.io/appaloft/agent-workspace-occupancy-grok:1.0.5";
 export const COMMUNITY_OCCUPANCY_GROK_TEMPLATE_DIGEST =
-  "sha256:44c959904fa7621dcaac49427f31df0738d34737f24205d9820fbfd8ca8895b8";
+  "sha256:203b9eeb2612f7ce6ff8c1b77dd1e78cf5a653737154d4bbef1c3046b5beed04";
 
 function occupancyVendorTemplateSpec(input: {
   readonly templateId: string;

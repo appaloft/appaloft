@@ -8,7 +8,7 @@ export const COMMUNITY_OCCUPANCY_OPENCODE_PROFILE_ID = "appaloft-remote";
 export const COMMUNITY_OCCUPANCY_PI_IMAGE = "ghcr.io/appaloft/agent-workspace-pi:0.82.0";
 export const COMMUNITY_OCCUPANCY_PI_VERSION = "0.82.0";
 export const COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST =
-  "sha256:6e20f0375ec3b99f68dd1fbd35ae3c5604fb30bc338a53bcdebf858d3a320b43";
+  "sha256:4e89f32d9953fa939e49e5640e399af020b15490b9becef55f423909a4d35190";
 export const COMMUNITY_OCCUPANCY_PI_ISOLATION = "container-trusted" as const;
 export const COMMUNITY_OCCUPANCY_PI_LIMITS = {
   cpuMillis: 2_000,

@@ -4,7 +4,7 @@ export const COMMUNITY_OCCUPANCY_OMP_TEMPLATE_NAME = "appaloft-remote-omp";
 export const COMMUNITY_OCCUPANCY_OMP_IMAGE =
   "ghcr.io/appaloft/agent-workspace-occupancy-omp:18.0.3";
 export const COMMUNITY_OCCUPANCY_OMP_TEMPLATE_DIGEST =
-  "sha256:565ff0a83fa2c9106c3e81dbd6237e48d8314cb878c75676ac6049c744815c34";
+  "sha256:f9eb5bcc6f3420d9a9fa5c7d7211092a8d66f20cf176f7ba7e04edaff4ce4bd2";
 export const COMMUNITY_OCCUPANCY_OMP_BIN = "/usr/local/bin/omp";
 export const COMMUNITY_OCCUPANCY_OMP_NATIVES = "/var/tmp/appaloft-bin/natives";
 export const COMMUNITY_OCCUPANCY_OMP_NATIVE_LINK = "/workspace/.omp/natives";
