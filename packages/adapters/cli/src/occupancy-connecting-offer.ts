@@ -17,7 +17,6 @@ import {
   offerOccupancyOpenCodeConnectAuth,
   offerOccupancyVendorCredential,
 } from "./occupancy-credential-offer.js";
-import { offerOccupancyAppaloftCli } from "./occupancy-cli-offer.js";
 import {
   type OccupancyAppaloftLogin,
   offerOccupancyAppaloftLogin,
@@ -113,16 +112,10 @@ export async function offerOccupancyConnectingMaterials(input: {
           },
         }),
   });
-  const cli = await offerOccupancyAppaloftCli({
-    workspaceId: input.workspaceId,
-    executeCommand: writeOnly,
-    destinationExists,
-  });
   const mcp = await offerOccupancyFirstPartyMcp({
     workspaceId: input.workspaceId,
     executeCommand: writeOnly,
     destinationExists,
-    ...(!cli.offered && login.login ? { login: login.login } : {}),
     ...(input.projectName ? { projectName: input.projectName } : {}),
     ...(input.projectId ? { projectId: input.projectId } : {}),
     ...(input.resources ? { resources: input.resources } : {}),
@@ -140,6 +133,5 @@ export async function offerOccupancyConnectingMaterials(input: {
     ...(credential ? { credential } : {}),
     ...(opencodeConnectOffered ? { opencodeConnectOffered: true } : {}),
     ...(login.offered ? { controlPlaneLogin: true } : {}),
-    ...(cli.offered ? { appaloftCli: true } : {}),
   });
 }

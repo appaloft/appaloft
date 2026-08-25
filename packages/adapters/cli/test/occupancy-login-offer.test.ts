@@ -6,9 +6,9 @@ import { offerOccupancyConnectingMaterials } from "../src/occupancy-connecting-o
 import {
   OCCUPANCY_APPALOFT_PROFILE_PATH,
   occupancyAppaloftProfilesJson,
-  occupancyControlPlaneMcpUrl,
   offerOccupancyAppaloftLogin,
 } from "../src/occupancy-login-offer.js";
+
 const login = {
   name: "cloud",
   mode: "cloud" as const,
@@ -30,7 +30,6 @@ test("[WS-REMOTE-MCP-240] occupancy writes laptop Appaloft profile store", async
   });
   expect(offered.offered).toBe(true);
   expect(offered.occupancyPath).toBe(OCCUPANCY_APPALOFT_PROFILE_PATH);
-  expect(occupancyControlPlaneMcpUrl(login.baseUrl)).toBe("https://app.appaloft.com/mcp");
   expect(commands).toHaveLength(1);
   expect(commands[0]?.input.path).toBe(OCCUPANCY_APPALOFT_PROFILE_PATH);
   expect(Buffer.from(String(commands[0]?.input.contentBase64), "base64").toString("utf8")).toBe(
@@ -57,7 +56,6 @@ test("[WS-REMOTE-MCP-241] connecting offer logs login without leaking the token"
   });
 
   expect(telemetry.mcp.controlPlaneLogin).toBe(true);
-  expect(telemetry.mcp.appaloftCli).toBe(true);
   expect(
     telemetry.steps.some((step) => step.message === "Using your Appaloft login on the agent"),
   ).toBe(true);

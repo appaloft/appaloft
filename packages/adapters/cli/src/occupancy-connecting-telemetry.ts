@@ -31,7 +31,6 @@ export interface OccupancyConnectingTelemetry {
     readonly firstParty: boolean;
     readonly remoteStdio: true;
     readonly controlPlaneLogin?: true;
-    readonly appaloftCli?: true;
   };
   readonly steps: readonly OccupancyConnectingStep[];
 }
@@ -45,7 +44,6 @@ export function occupancyConnectingSteps(input: {
   readonly credentialOffered?: boolean;
   readonly opencodeConnectOffered?: boolean;
   readonly controlPlaneLogin?: boolean;
-  readonly appaloftCli?: boolean;
   readonly skillCount: number;
   readonly credentialPath?: string;
   readonly skillsPath?: string;
@@ -97,7 +95,6 @@ export function occupancyConnectingTelemetry(input: {
   readonly credential?: OccupancyConnectingTelemetry["credential"];
   readonly opencodeConnectOffered?: boolean;
   readonly controlPlaneLogin?: boolean;
-  readonly appaloftCli?: boolean;
   readonly skillCount: number;
   readonly firstPartyMcp: boolean;
   readonly credentialPath?: string;
@@ -116,7 +113,6 @@ export function occupancyConnectingTelemetry(input: {
       firstParty: input.firstPartyMcp,
       remoteStdio: true,
       ...(input.controlPlaneLogin ? { controlPlaneLogin: true } : {}),
-      ...(input.appaloftCli ? { appaloftCli: true } : {}),
     },
     steps: occupancyConnectingSteps({
       skillCount: input.skillCount,
@@ -124,7 +120,6 @@ export function occupancyConnectingTelemetry(input: {
       ...(input.credential ? { credentialOffered: input.credential.offered } : {}),
       ...(input.opencodeConnectOffered ? { opencodeConnectOffered: true } : {}),
       ...(input.controlPlaneLogin ? { controlPlaneLogin: true } : {}),
-      ...(input.appaloftCli ? { appaloftCli: true } : {}),
       ...(input.credentialPath ? { credentialPath: input.credentialPath } : {}),
       ...(input.skillsPath ? { skillsPath: input.skillsPath } : {}),
       ...(input.agentName ? { agentName: input.agentName } : {}),
