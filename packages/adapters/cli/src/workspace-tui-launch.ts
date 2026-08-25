@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url";
 const loopbackHost = "127.0.0.1";
 const maxProtocolLineBytes = 1_048_576;
 const rendererConnectTimeoutMs = 5_000;
-const rendererExitTimeoutMs = 1_000;
-
+export const RENDERER_EXIT_TIMEOUT_MS = 1_000;
+const rendererExitTimeoutMs = RENDERER_EXIT_TIMEOUT_MS;
 export type OccupancyTuiStdin = {
   pause?(): void;
   resume?(): void;
@@ -30,6 +30,30 @@ export function pauseParentStdinForOccupancyTui(
 export interface WorkspaceControlRendererProcess {
   readonly exited: Promise<void>;
   terminate(): void;
+}
+
+export type KillableRendererChild = {
+  kill(signal?: NodeJS.Signals): boolean;
+  readonly exitCode: number | null;
+  readonly signalCode: NodeJS.Signals | null;
+  once(event: "exit", listener: () => void): unknown;
+};
+
+export function terminateRendererChild(
+  child: KillableRendererChild,
+  escalateAfterMs = RENDERER_EXIT_TIMEOUT_MS,
+): void {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  child.kill("SIGTERM");
+  const killer = setTimeout(() => {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGKILL");
+    }
+  }, escalateAfterMs);
+  killer.unref();
+  child.once("exit", () => {
+    clearTimeout(killer);
+  });
 }
 
 export interface WorkspaceControlRendererLaunchInput {
@@ -1101,7 +1125,7 @@ export async function openWorkspaceControlRenderer(
       return {
         exited,
         terminate() {
-          child.kill();
+          terminateRendererChild(child);
         },
       };
     },

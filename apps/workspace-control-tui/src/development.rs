@@ -1,11 +1,14 @@
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufReader, Write};
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use appaloft_workspace_control_tui::{
+    ParentBatch, TerminalDrain, drain_terminal_events, recv_parent_batch, spawn_line_parent_reader,
+    spawn_stop_watchdog,
+};
 use crossterm::event::{Event, KeyCode, KeyEventKind, poll, read};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
@@ -213,18 +216,11 @@ pub fn run(mut writer: TcpStream, reader: BufReader<TcpStream>) -> Result<()> {
     let mut terminal = Terminal::new(backend).context("create Development Ratatui terminal")?;
     terminal.clear().context("clear Development TUI surface")?;
 
-    let (message_tx, message_rx) = mpsc::channel::<DevelopmentMessage>();
-    std::thread::spawn(move || {
-        for line in reader.lines() {
-            let Ok(line) = line else { break };
-            let Ok(message) = serde_json::from_str::<DevelopmentMessage>(&line) else {
-                continue;
-            };
-            if message_tx.send(message).is_err() {
-                break;
-            }
-        }
-    });
+    let message_rx = spawn_line_parent_reader(
+        reader,
+        |line| serde_json::from_str::<DevelopmentMessage>(line).ok(),
+        Some(DevelopmentMessage::Shutdown),
+    );
 
     let stop = Arc::new(AtomicBool::new(false));
     for signal in [
@@ -236,6 +232,7 @@ pub fn run(mut writer: TcpStream, reader: BufReader<TcpStream>) -> Result<()> {
         signal_hook::flag::register(signal, Arc::clone(&stop))
             .context("register Development terminal restore signal")?;
     }
+    spawn_stop_watchdog(Arc::clone(&stop));
 
     let mut state = DevelopmentState {
         status_line: "Connected".to_owned(),
@@ -243,21 +240,44 @@ pub fn run(mut writer: TcpStream, reader: BufReader<TcpStream>) -> Result<()> {
     };
     let mut running = true;
     while running && !stop.load(Ordering::Relaxed) {
-        for message in message_rx.try_iter() {
-            if !state.apply(message) {
+        match recv_parent_batch(&message_rx) {
+            ParentBatch::Disconnected => {
                 running = false;
-                break;
+                continue;
             }
+            ParentBatch::Messages(messages) => {
+                for message in messages {
+                    if !state.apply(message) {
+                        running = false;
+                        break;
+                    }
+                }
+            }
+        }
+        if !running {
+            continue;
         }
         terminal
             .draw(|frame| render(frame, &state))
             .context("render Development TUI")?;
-        if !poll(Duration::from_millis(50)).context("poll Development terminal input")? {
-            continue;
-        }
-        if let Event::Key(key) = read().context("read Development terminal input")?
-            && key.kind == KeyEventKind::Press
-        {
+        let events =
+            match drain_terminal_events(Duration::from_millis(50), poll, read, Some(stop.as_ref()))
+                .context("drain Development terminal input")?
+            {
+                TerminalDrain::Empty => continue,
+                TerminalDrain::Ended => {
+                    running = false;
+                    continue;
+                }
+                TerminalDrain::Events(events) => events,
+            };
+        for event in events {
+            let Event::Key(key) = event else {
+                continue;
+            };
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
             match key.code {
                 KeyCode::Char('q') => {
                     send(&mut writer, DevelopmentEvent::DevelopmentDetach)?;

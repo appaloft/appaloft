@@ -11,6 +11,7 @@ import {
   restoreWorkspaceTuiScrollback,
   sanitizeWorkspaceRendererFailureText,
   setWorkspaceTuiScrollbackWriter,
+  terminateRendererChild,
   WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
   WORKSPACE_TUI_DISABLE_MOUSE,
   WORKSPACE_TUI_LEAVE_ALT_SCREEN,
@@ -409,5 +410,48 @@ describe("occupancy TUI slim launch", () => {
     expect(calls).toEqual(["pause", "raw:false"]);
     release();
     expect(calls).toEqual(["pause", "raw:false", "pause"]);
+  });
+
+  test("[WS-TUI-ORPHAN-014] host SIGTERM escalates to SIGKILL if the renderer stays up", async () => {
+    const signals: NodeJS.Signals[] = [];
+    let exitListener: (() => void) | undefined;
+    const child = {
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill(signal?: NodeJS.Signals) {
+        signals.push(signal ?? "SIGTERM");
+        return true;
+      },
+      once(event: "exit", listener: () => void) {
+        if (event === "exit") exitListener = listener;
+        return child;
+      },
+    };
+    terminateRendererChild(child, 20);
+    expect(signals).toEqual(["SIGTERM"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
+    child.exitCode = 1;
+    exitListener?.();
+  });
+
+  test("[WS-TUI-ORPHAN-014] host does not SIGKILL a renderer that already exited", async () => {
+    const signals: NodeJS.Signals[] = [];
+    const child = {
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill(signal?: NodeJS.Signals) {
+        signals.push(signal ?? "SIGTERM");
+        child.exitCode = 0;
+        return true;
+      },
+      once(event: "exit", listener: () => void) {
+        if (event === "exit") listener();
+        return child;
+      },
+    };
+    terminateRendererChild(child, 20);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(signals).toEqual(["SIGTERM"]);
   });
 });
