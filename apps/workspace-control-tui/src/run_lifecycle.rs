@@ -148,7 +148,7 @@ mod tests {
     use std::io;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::mpsc;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::time::{Duration, Instant};
 
     #[test]
@@ -276,27 +276,23 @@ mod tests {
     #[test]
     fn stop_watchdog_fires_when_loop_stays_stuck() {
         let stop = Arc::new(AtomicBool::new(true));
-        let fired = Arc::new(Mutex::new(false));
-        let fired_flag = Arc::clone(&fired);
+        let (tx, rx) = mpsc::channel();
         spawn_stop_watchdog_with(stop, Duration::from_millis(20), move || {
-            *fired_flag.lock().expect("lock") = true;
+            let _ = tx.send(());
         });
-        std::thread::sleep(Duration::from_millis(80));
-        assert!(*fired.lock().expect("lock"));
+        rx.recv_timeout(Duration::from_secs(2)).expect("watchdog fired");
     }
 
     #[test]
     fn stop_watchdog_waits_for_stop_flag() {
         let stop = Arc::new(AtomicBool::new(false));
-        let fired = Arc::new(Mutex::new(false));
-        let fired_flag = Arc::clone(&fired);
+        let (tx, rx) = mpsc::channel();
         spawn_stop_watchdog_with(Arc::clone(&stop), Duration::from_millis(20), move || {
-            *fired_flag.lock().expect("lock") = true;
+            let _ = tx.send(());
         });
-        std::thread::sleep(Duration::from_millis(40));
-        assert!(!*fired.lock().expect("lock"));
+        assert!(rx.recv_timeout(Duration::from_millis(50)).is_err());
         stop.store(true, Ordering::Relaxed);
-        std::thread::sleep(Duration::from_millis(60));
-        assert!(*fired.lock().expect("lock"));
+        rx.recv_timeout(Duration::from_secs(2))
+            .expect("watchdog fired after stop");
     }
 }
