@@ -12,7 +12,13 @@ import { type Result } from "@appaloft/core";
 import { resolveAppaloftSkillPath } from "./local-scratch-session.js";
 
 export const OCCUPANCY_SKILL_ROOTS = ["skills/appaloft", ".agents/skills/appaloft"] as const;
-export const OCCUPANCY_SKILL_GIT_EXCLUDES = ["/skills/", "/.agents/"] as const;
+export const OCCUPANCY_SKILL_GIT_EXCLUDES = [
+  "/skills/",
+  "/.agents/",
+  "/.appaloft/",
+  "/AGENTS.md",
+  "/GROK.md",
+] as const;
 export const OCCUPANCY_HOME_SKILL_DESTINATIONS = ["skills", ".agents/skills"] as const;
 export const OCCUPANCY_HOME_SKILL_MAX_FILE_BYTES = 10 * 1024 * 1024;
 
