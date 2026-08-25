@@ -146,9 +146,9 @@ pub fn spawn_stop_watchdog_with(
 mod tests {
     use super::*;
     use std::io;
+    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::mpsc;
-    use std::sync::Arc;
     use std::time::{Duration, Instant};
 
     #[test]
@@ -280,7 +280,8 @@ mod tests {
         spawn_stop_watchdog_with(stop, Duration::from_millis(20), move || {
             let _ = tx.send(());
         });
-        rx.recv_timeout(Duration::from_secs(2)).expect("watchdog fired");
+        rx.recv_timeout(Duration::from_secs(2))
+            .expect("watchdog fired");
     }
 
     #[test]
