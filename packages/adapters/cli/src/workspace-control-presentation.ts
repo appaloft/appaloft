@@ -1261,7 +1261,7 @@ export function createBoundedWorkspaceControlPresentation(
               }
               await attachIssuedDescriptor(occupied.attach);
               if (occupied.workspaceId) selectedWorkspaceId = occupied.workspaceId;
-              const chromeProject = context.occupancyChrome?.project ?? occupied?.projectName;
+              const chromeProject = occupied?.projectName ?? context.occupancyChrome?.project;
               if (chromeProject) {
                 await renderer.send({
                   type: "chrome",

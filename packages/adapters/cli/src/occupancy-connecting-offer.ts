@@ -1,4 +1,5 @@
 import { homedir } from "node:os";
+import { join } from "node:path";
 
 import {
   type ExecuteSandboxCommand,
@@ -16,6 +17,10 @@ import {
   offerOccupancyOpenCodeConnectAuth,
   offerOccupancyVendorCredential,
 } from "./occupancy-credential-offer.js";
+import {
+  type OccupancyAppaloftLogin,
+  offerOccupancyAppaloftLogin,
+} from "./occupancy-login-offer.js";
 import { offerOccupancyFirstPartyMcp } from "./occupancy-mcp-offer.js";
 import {
   listOccupancyHomeSkillOfferFiles,
@@ -40,6 +45,14 @@ export async function offerOccupancyConnectingMaterials(input: {
   readonly homeDir?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly appaloftSkillDir?: string;
+  readonly appaloftLogin?: OccupancyAppaloftLogin;
+  readonly projectName?: string;
+  readonly projectId?: string;
+  readonly resources?: readonly {
+    readonly name: string;
+    readonly kind?: string;
+    readonly source?: string;
+  }[];
   readonly executeCommand: (
     command: WriteSandboxFileCommand | ExecuteSandboxCommand,
   ) => Promise<Result<unknown>>;
@@ -82,10 +95,30 @@ export async function offerOccupancyConnectingMaterials(input: {
     opencodeConnectOffered = offered.offered;
   }
 
+  const login = await offerOccupancyAppaloftLogin({
+    workspaceId: input.workspaceId,
+    executeCommand: writeOnly,
+    destinationExists,
+    ...(input.appaloftLogin
+      ? { login: input.appaloftLogin }
+      : {
+          deps: {
+            env: {
+              ...(input.env ?? process.env),
+              APPALOFT_HOME:
+                input.env?.APPALOFT_HOME ??
+                (input.homeDir ? join(input.homeDir, ".appaloft") : process.env.APPALOFT_HOME),
+            },
+          },
+        }),
+  });
   const mcp = await offerOccupancyFirstPartyMcp({
     workspaceId: input.workspaceId,
     executeCommand: writeOnly,
     destinationExists,
+    ...(input.projectName ? { projectName: input.projectName } : {}),
+    ...(input.projectId ? { projectId: input.projectId } : {}),
+    ...(input.resources ? { resources: input.resources } : {}),
   });
   return occupancyConnectingTelemetry({
     harness: input.harness,
@@ -99,5 +132,6 @@ export async function offerOccupancyConnectingMaterials(input: {
     ...(input.vendor ? { vendor: input.vendor } : {}),
     ...(credential ? { credential } : {}),
     ...(opencodeConnectOffered ? { opencodeConnectOffered: true } : {}),
+    ...(login.offered ? { controlPlaneLogin: true } : {}),
   });
 }

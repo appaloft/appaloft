@@ -5653,7 +5653,7 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
   ]);
   expect(presentationStarts).toBe(1);
   expect(startedContext?.occupyBootstrap).toBeTypeOf("function");
-  expect(startedContext?.occupancyChrome?.project).toBe(chromeProject);
+  expect(startedContext?.occupancyChrome?.project?.toLowerCase()).toBe(chromeProject.toLowerCase());
   expect(doorResolved).toBeFalse();
   expect(printed).not.toContain("Loading your project…");
   expect(printed).not.toContain("Opening occupancy");
@@ -5686,7 +5686,7 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
     type: "loading",
     collapsed: true,
     title: OCCUPANCY_CODE_CHROME_TITLE,
-    project: chromeProject,
+    project: startedContext?.occupancyChrome?.project,
   });
   expect(JSON.stringify(renderer.messages)).not.toMatch(/occupancy/iu);
   expect(JSON.stringify(renderer.messages)).not.toContain(

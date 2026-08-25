@@ -30,6 +30,7 @@ export interface OccupancyConnectingTelemetry {
   readonly mcp: {
     readonly firstParty: boolean;
     readonly remoteStdio: true;
+    readonly controlPlaneLogin?: true;
   };
   readonly steps: readonly OccupancyConnectingStep[];
 }
@@ -42,6 +43,7 @@ export function occupancyConnectingSteps(input: {
   readonly vendor?: OccupancyVendor;
   readonly credentialOffered?: boolean;
   readonly opencodeConnectOffered?: boolean;
+  readonly controlPlaneLogin?: boolean;
   readonly skillCount: number;
   readonly credentialPath?: string;
   readonly skillsPath?: string;
@@ -61,6 +63,12 @@ export function occupancyConnectingSteps(input: {
     steps.push({
       id: "credential",
       message: withPath("Using your OpenCode login", input.credentialPath) + " on the agent",
+    });
+  }
+  if (input.controlPlaneLogin) {
+    steps.push({
+      id: "credential",
+      message: "Using your Appaloft login on the agent",
     });
   }
   steps.push({
@@ -86,6 +94,7 @@ export function occupancyConnectingTelemetry(input: {
   readonly harness: OccupancyHarness;
   readonly credential?: OccupancyConnectingTelemetry["credential"];
   readonly opencodeConnectOffered?: boolean;
+  readonly controlPlaneLogin?: boolean;
   readonly skillCount: number;
   readonly firstPartyMcp: boolean;
   readonly credentialPath?: string;
@@ -103,12 +112,14 @@ export function occupancyConnectingTelemetry(input: {
     mcp: {
       firstParty: input.firstPartyMcp,
       remoteStdio: true,
+      ...(input.controlPlaneLogin ? { controlPlaneLogin: true } : {}),
     },
     steps: occupancyConnectingSteps({
       skillCount: input.skillCount,
       ...(input.vendor ? { vendor: input.vendor } : {}),
       ...(input.credential ? { credentialOffered: input.credential.offered } : {}),
       ...(input.opencodeConnectOffered ? { opencodeConnectOffered: true } : {}),
+      ...(input.controlPlaneLogin ? { controlPlaneLogin: true } : {}),
       ...(input.credentialPath ? { credentialPath: input.credentialPath } : {}),
       ...(input.skillsPath ? { skillsPath: input.skillsPath } : {}),
       ...(input.agentName ? { agentName: input.agentName } : {}),
