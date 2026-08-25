@@ -40,6 +40,13 @@ export async function offerOccupancyConnectingMaterials(input: {
   readonly homeDir?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly appaloftSkillDir?: string;
+  readonly projectName?: string;
+  readonly projectId?: string;
+  readonly resources?: readonly {
+    readonly name: string;
+    readonly kind?: string;
+    readonly source?: string;
+  }[];
   readonly executeCommand: (
     command: WriteSandboxFileCommand | ExecuteSandboxCommand,
   ) => Promise<Result<unknown>>;
@@ -86,6 +93,9 @@ export async function offerOccupancyConnectingMaterials(input: {
     workspaceId: input.workspaceId,
     executeCommand: writeOnly,
     destinationExists,
+    ...(input.projectName ? { projectName: input.projectName } : {}),
+    ...(input.projectId ? { projectId: input.projectId } : {}),
+    ...(input.resources ? { resources: input.resources } : {}),
   });
   return occupancyConnectingTelemetry({
     harness: input.harness,

@@ -2232,6 +2232,64 @@ describe("Workspace control presentation", () => {
     expect(renderer.messages.some((message) => message.type === "workspaces")).toBeFalse();
   });
 
+  test("[WS-REMOTE-CHROME-239] occupy Project name wins over folder chrome", async () => {
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const renderer = new FakeRendererSession([]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        if (
+          this.messages.some(
+            (message) => message.type === "chrome" && message.project === "appaloft-cloud-2",
+          )
+        ) {
+          break;
+        }
+        await Promise.resolve();
+      }
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    await presentation.start({
+      occupancyChrome: { project: "appaloft-cloud" },
+      occupyBootstrap: async () => ({
+        workspaceId: "sbx_1",
+        projectName: "appaloft-cloud-2",
+        attach: {
+          workspaceId: "sbx_1",
+          runtimeId: "sar_1",
+          transport: "managed-terminal",
+          sessionId: "term_occupy",
+          processId: "proc_1",
+          access: {
+            kind: "websocket",
+            path: "/sessions/term_occupy",
+            expiresAt: "2099-01-01T00:00:00.000Z",
+          },
+        },
+      }),
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>() => ok({ items: [] } as T),
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "chrome",
+      title: "Appaloft Cloud Agents",
+      project: "appaloft-cloud-2",
+    });
+  });
+
   test("[WS-REMOTE-PROGRESS-196] attach does not surface list or detail conflicts", async () => {
     const terminal = {
       detached: 0,

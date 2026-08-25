@@ -1047,8 +1047,9 @@ export const workspaceCodeCommand = EffectCommand.make(
         );
       };
       const occupancyTui = cli.workspaceControlPresentation;
+      let linkedProjectName: string | undefined;
       if (useOccupancyTui && !yes) {
-        yield* ensureFolderProjectOnboarding({
+        const onboarded = yield* ensureFolderProjectOnboarding({
           cwd: folderOnboardingCwdFromLocator(path),
           canPrompt: true,
           promptPolicy: "pre-tui-inquire",
@@ -1064,9 +1065,9 @@ export const workspaceCodeCommand = EffectCommand.make(
             return Effect.fail(workspaceCliError(error, "folder-project-onboarding"));
           }),
         );
+        linkedProjectName = onboarded.projectName;
       }
       if (useOccupancyTui && occupancyTui) {
-        const occupancyFolderName = folderDirectoryName(folderOnboardingCwdFromLocator(path));
         yield* Effect.tryPromise({
           try: () =>
             occupancyTui.start({
@@ -1078,7 +1079,9 @@ export const workspaceCodeCommand = EffectCommand.make(
               ...(cli.openNativeWorkspaceTerminal
                 ? { openNativeWorkspaceTerminal: cli.openNativeWorkspaceTerminal }
                 : {}),
-              occupancyChrome: { project: occupancyFolderName },
+              occupancyChrome: {
+                ...(linkedProjectName ? { project: linkedProjectName } : {}),
+              },
               occupyBootstrap: async ({ reportProgress: tuiProgress, signal }) => {
                 const occupied = await occupyRemote(
                   (message, progress) => {
@@ -1091,6 +1094,30 @@ export const workspaceCodeCommand = EffectCommand.make(
                     attach: false,
                   },
                 );
+                const projectId =
+                  occupied.door.projectId && occupied.door.projectId !== "project"
+                    ? occupied.door.projectId
+                    : occupied.result.projectId;
+                const projectName = occupied.door.projectName ?? linkedProjectName;
+                let projectResources: Array<{
+                  name: string;
+                  kind?: string;
+                }> = [];
+                if (projectId) {
+                  const resourcesQuery = ListResourcesQuery.create({
+                    projectId,
+                    limit: 100,
+                  });
+                  if (resourcesQuery.isOk()) {
+                    const listed = await cli.executeQuery(resourcesQuery.value);
+                    if (listed.isOk()) {
+                      projectResources = (listed.value.items ?? []).map((resource) => ({
+                        name: resource.name,
+                        kind: String(resource.kind),
+                      }));
+                    }
+                  }
+                }
                 const materials = await settleWithTimeout(
                   offerOccupancyConnectingMaterials({
                     workspaceId: occupied.result.workspaceId,
@@ -1100,6 +1127,9 @@ export const workspaceCodeCommand = EffectCommand.make(
                     ...(occupancyVendor.vendor ? { vendor: occupancyVendor.vendor } : {}),
                     ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
                     ...(cli.environment ? { env: cli.environment } : {}),
+                    ...(projectName ? { projectName } : {}),
+                    ...(projectId ? { projectId } : {}),
+                    ...(projectResources.length > 0 ? { resources: projectResources } : {}),
                   }),
                   occupancyTimeoutMs(
                     "APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS",

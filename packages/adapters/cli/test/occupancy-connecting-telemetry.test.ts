@@ -95,7 +95,13 @@ test("[WS-REMOTE-MCP-214] occupancy MCP offer writes first-party stdio and not l
   expect(telemetry.steps.map((step) => step.id)).toEqual(["credential", "skills", "disk"]);
   expect(telemetry.mcp.firstParty).toBe(true);
   expect(commands.map((command) => command.input.path)).toEqual(
-    expect.arrayContaining([".grok/auth.json", OCCUPANCY_FIRST_PARTY_MCP_PATH]),
+    expect.arrayContaining([
+      ".grok/auth.json",
+      OCCUPANCY_FIRST_PARTY_MCP_PATH,
+      ".grok/config.toml",
+      ".claude.json",
+      ".codex/config.toml",
+    ]),
   );
   const mcp = commands.find((command) => command.input.path === OCCUPANCY_FIRST_PARTY_MCP_PATH);
   expect(mcp).toBeDefined();
