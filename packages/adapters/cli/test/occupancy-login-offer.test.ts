@@ -57,6 +57,7 @@ test("[WS-REMOTE-MCP-241] connecting offer logs login without leaking the token"
   });
 
   expect(telemetry.mcp.controlPlaneLogin).toBe(true);
+  expect(telemetry.mcp.appaloftCli).toBe(true);
   expect(
     telemetry.steps.some((step) => step.message === "Using your Appaloft login on the agent"),
   ).toBe(true);
@@ -67,7 +68,10 @@ test("[WS-REMOTE-MCP-241] connecting offer logs login without leaking the token"
   expect(grok).toBeDefined();
   if (!grok) return;
   expect(Buffer.from(String(grok.input.contentBase64), "base64").toString("utf8")).toContain(
-    "https://app.appaloft.com/mcp",
+    'command = "appaloft"',
+  );
+  expect(Buffer.from(String(grok.input.contentBase64), "base64").toString("utf8")).not.toContain(
+    "occ_login_token",
   );
   expect(JSON.stringify(telemetry)).not.toContain("occ_login_token");
 });

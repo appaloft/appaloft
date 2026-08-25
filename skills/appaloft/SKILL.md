@@ -65,7 +65,7 @@ surface available in the session.
   progress and the Remote banner. Skill copy is fail-soft and time-bounded.
   Before answering “what project am I in?”, read `.appaloft/project.md` and call Appaloft MCP
   (`projects_show`, `resources_list`) or `appaloft project show` / `appaloft resource list`.
-  Occupy copies the laptop Appaloft login onto `.appaloft/profiles.json` and points vendor MCP at the control-plane `/mcp`.
+  Occupy copies the laptop Appaloft login onto `.appaloft/profiles.json` and installs the official `appaloft` CLI onto the occupancy disk. Vendor MCP uses `appaloft mcp stdio` when that binary is present; otherwise it uses control-plane `/mcp`.
   The git remote is one Resource source, not the Project. A Project can have many Resources
   (git, static site, or Docker). From inside OpenCode, use first-party `appaloft-tools` to list/plan/create
   CLI `env set KEY VALUE` / `env unset KEY` / `env show` / `env effective-precedence`, or MCP
