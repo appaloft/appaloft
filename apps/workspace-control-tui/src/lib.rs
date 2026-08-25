@@ -1,4 +1,11 @@
 mod home;
+mod run_lifecycle;
+
+pub use run_lifecycle::{
+    MAX_PENDING_TERMINAL_EVENTS, ParentBatch, STOP_WATCHDOG_TIMEOUT, TerminalDrain,
+    drain_terminal_events, recv_parent_batch, restore_hosted_terminal, spawn_line_parent_reader,
+    spawn_stop_watchdog,
+};
 
 pub use home::{
     HomeDecision, HomeFocus, HomeState, HomeTarget, OCCUPANCY_HOME_QUESTION, OCCUPANCY_HOME_TITLE,

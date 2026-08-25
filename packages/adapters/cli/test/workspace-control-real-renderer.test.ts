@@ -7,9 +7,14 @@ import { resolve } from "node:path";
 import { writeWorkspaceControlRendererLine } from "../src/workspace-tui-launch";
 
 const root = resolve(import.meta.dir, "../../../..");
+const debugBinary = resolve(root, "apps/workspace-control-tui/target/debug/appaloft-workspace-tui");
+const releaseBinary = resolve(
+  root,
+  "apps/workspace-control-tui/target/release/appaloft-workspace-tui",
+);
 const binaryPath =
   process.env.APPALOFT_WORKSPACE_TUI_BINARY ??
-  resolve(root, "apps/workspace-control-tui/target/release/appaloft-workspace-tui");
+  (existsSync(debugBinary) ? debugBinary : releaseBinary);
 const realRendererTest =
   existsSync(binaryPath) || process.env.APPALOFT_WORKSPACE_TUI_REQUIRED === "true"
     ? test
@@ -138,4 +143,140 @@ realRendererTest(
     }
   },
   15_000,
+);
+
+async function waitForExit(child: { exited: Promise<number> }, ms: number): Promise<number> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      child.exited,
+      new Promise<number>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`renderer still running after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function spawnHandshakenRenderer(input: {
+  readonly mode?: "operate" | "development";
+}): Promise<{
+  child: ReturnType<typeof Bun.spawn>;
+  terminal: Bun.Terminal;
+  destroyParent: () => void;
+  close: () => void;
+}> {
+  const token = `orphan-exit-${input.mode ?? "occupancy"}`;
+  let rendererSocket: Socket | undefined;
+  const handshake = Promise.withResolvers<void>();
+  const server = createServer((socket) => {
+    rendererSocket = socket;
+    socket.setEncoding("utf8");
+    socket.on("error", (error) => {
+      if ((error as NodeJS.ErrnoException).code === "EPIPE") return;
+    });
+    let buffer = "";
+    socket.on("data", (chunk) => {
+      buffer += String(chunk);
+      if (!buffer.includes("\n")) return;
+      const line = buffer.slice(0, buffer.indexOf("\n"));
+      const message = JSON.parse(line) as Record<string, unknown>;
+      if (message.type === "hello" && message.token === token) {
+        void writeWorkspaceControlRendererLine(socket, { type: "hello-ok" }).then(() => {
+          handshake.resolve();
+        });
+      }
+    });
+  });
+  await new Promise<void>((resolveListen, rejectListen) => {
+    server.once("error", rejectListen);
+    server.listen({ host: "127.0.0.1", port: 0, exclusive: true }, resolveListen);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("missing test listener address");
+  const terminal = new Bun.Terminal({ cols: 100, rows: 30 });
+  const child = Bun.spawn([binaryPath], {
+    terminal,
+    env: {
+      ...process.env,
+      APPALOFT_WORKSPACE_TUI_PORT: String(address.port),
+      APPALOFT_WORKSPACE_TUI_TOKEN: token,
+      ...(input.mode ? { APPALOFT_TUI_MODE: input.mode } : {}),
+    },
+  });
+  await handshake.promise;
+  return {
+    child,
+    terminal,
+    destroyParent: () => {
+      rendererSocket?.destroy();
+    },
+    close: () => {
+      child.kill("SIGKILL");
+      rendererSocket?.destroy();
+      server.close();
+      terminal.close();
+    },
+  };
+}
+
+realRendererTest(
+  "[WS-TUI-ORPHAN-014] occupancy exits after parent TCP drop without Shutdown",
+  async () => {
+    expect(existsSync(binaryPath)).toBe(true);
+    const session = await spawnHandshakenRenderer({});
+    try {
+      session.destroyParent();
+      await waitForExit(session.child, 500);
+    } finally {
+      session.close();
+    }
+  },
+  8_000,
+);
+
+realRendererTest(
+  "[WS-TUI-ORPHAN-014] occupancy SIGTERM exits within 200ms",
+  async () => {
+    expect(existsSync(binaryPath)).toBe(true);
+    const session = await spawnHandshakenRenderer({});
+    try {
+      session.child.kill("SIGTERM");
+      await waitForExit(session.child, 200);
+    } finally {
+      session.close();
+    }
+  },
+  8_000,
+);
+
+realRendererTest(
+  "[WS-TUI-ORPHAN-014] operate exits after parent TCP drop without Shutdown",
+  async () => {
+    expect(existsSync(binaryPath)).toBe(true);
+    const session = await spawnHandshakenRenderer({ mode: "operate" });
+    try {
+      session.destroyParent();
+      await waitForExit(session.child, 500);
+    } finally {
+      session.close();
+    }
+  },
+  8_000,
+);
+
+realRendererTest(
+  "[WS-TUI-ORPHAN-014] development exits after parent TCP drop without Shutdown",
+  async () => {
+    expect(existsSync(binaryPath)).toBe(true);
+    const session = await spawnHandshakenRenderer({ mode: "development" });
+    try {
+      session.destroyParent();
+      await waitForExit(session.child, 500);
+    } finally {
+      session.close();
+    }
+  },
+  8_000,
 );

@@ -3,7 +3,6 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpStream};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
 use std::time::Duration;
 
 mod development;
@@ -12,20 +11,19 @@ mod operate;
 use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
     ActionDecision, AppState, DeliveryDecision, DeliverySubmission, OCCUPANCY_FIRST_SCREEN_LAYOUT,
-    OccupancyHomeKey, OccupancyKeyBinding, ParentMessage, RecoverySubmission, RendererEvent,
-    agent_area, drop_mouse_when_typing, is_occupancy_ctrl_c, occupancy_agent_accepts_key,
-    occupancy_home_key, occupancy_key_binding, occupancy_stop_signals, render,
-    terminal_agent_paste_bytes, terminal_key_bytes, terminal_mouse_bytes, write_osc52_passthrough,
+    OccupancyHomeKey, OccupancyKeyBinding, ParentBatch, ParentMessage, RecoverySubmission,
+    RendererEvent, TerminalDrain, agent_area, drain_terminal_events, drop_mouse_when_typing,
+    is_occupancy_ctrl_c, occupancy_agent_accepts_key, occupancy_home_key, occupancy_key_binding,
+    occupancy_stop_signals, recv_parent_batch, render, restore_hosted_terminal,
+    spawn_line_parent_reader, spawn_stop_watchdog, terminal_agent_paste_bytes, terminal_key_bytes,
+    terminal_mouse_bytes, write_osc52_passthrough,
 };
 
 use crossterm::event::{
-    DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, Event,
-    KeyCode, KeyEventKind, poll, read,
+    EnableBracketedPaste, EnableMouseCapture, Event, KeyCode, KeyEventKind, poll, read,
 };
 use crossterm::execute;
-use crossterm::terminal::{
-    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
-};
+use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
@@ -48,13 +46,7 @@ impl TerminalRestore {
 
 impl Drop for TerminalRestore {
     fn drop(&mut self) {
-        let _ = disable_raw_mode();
-        let _ = execute!(
-            std::io::stdout(),
-            DisableBracketedPaste,
-            DisableMouseCapture,
-            LeaveAlternateScreen
-        );
+        restore_hosted_terminal();
     }
 }
 
@@ -64,15 +56,8 @@ fn send(stream: &mut TcpStream, event: &RendererEvent) -> Result<()> {
     stream.flush().context("flush renderer event")
 }
 
-fn take_pending_events(first_wait: Duration) -> Result<Vec<Event>> {
-    if !poll(first_wait).context("poll terminal input")? {
-        return Ok(Vec::new());
-    }
-    let mut events = vec![read().context("read terminal input")?];
-    while poll(Duration::ZERO).context("drain terminal input")? {
-        events.push(read().context("read terminal input")?);
-    }
-    Ok(events)
+fn take_pending_events(first_wait: Duration, stop: &AtomicBool) -> Result<TerminalDrain<Event>> {
+    drain_terminal_events(first_wait, poll, read, Some(stop)).context("drain terminal input")
 }
 
 fn send_delivery(
@@ -178,24 +163,18 @@ fn main() -> Result<()> {
         }
     };
 
-    let (message_tx, message_rx) = mpsc::channel::<ParentMessage>();
-    std::thread::spawn(move || {
-        for line in reader.lines() {
-            let Ok(line) = line else { break };
-            let Ok(message) = serde_json::from_str::<ParentMessage>(&line) else {
-                continue;
-            };
-            if message_tx.send(message).is_err() {
-                break;
-            }
-        }
-    });
+    let message_rx = spawn_line_parent_reader(
+        reader,
+        |line| serde_json::from_str::<ParentMessage>(line).ok(),
+        Some(ParentMessage::Shutdown),
+    );
 
     let stop = Arc::new(AtomicBool::new(false));
     for signal in occupancy_stop_signals() {
         signal_hook::flag::register(*signal, Arc::clone(&stop))
             .context("register terminal restore signal")?;
     }
+    spawn_stop_watchdog(Arc::clone(&stop));
     let interrupt = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&interrupt))
         .context("register wait-screen interrupt")?;
@@ -212,59 +191,75 @@ fn main() -> Result<()> {
             running = false;
             continue;
         }
-        for message in message_rx.try_iter() {
-            primed = true;
-            if matches!(message, ParentMessage::Shutdown) {
+        match recv_parent_batch(&message_rx) {
+            ParentBatch::Disconnected => {
                 running = false;
-                break;
-            }
-            let before = state.selected_workspace_id().map(str::to_owned);
-            let terminal_healthy = matches!(message, ParentMessage::TerminalOutput { .. });
-            let should_reconnect = matches!(
-                &message,
-                ParentMessage::Error {
-                    phase,
-                    retryable: true,
-                    ..
-                } if phase == "workspace-control-terminal"
-            ) && state.session_id.is_some()
-                && reconnect_attempts < 3;
-            state.apply(message);
-            let sequences = state.take_osc52();
-            if !sequences.is_empty()
-                && write_osc52_passthrough(&mut std::io::stdout(), &sequences).is_err()
-            {
-                state.mark_osc52_passthrough_failed();
-            }
-            if terminal_healthy {
-                reconnect_attempts = 0;
-            } else if should_reconnect {
-                reconnect_attempts += 1;
-                send(&mut writer, &RendererEvent::TerminalReconnect)?;
-            }
-            let selected = state.selected_workspace_id().map(str::to_owned);
-            if state.should_emit_workspace_select()
-                && let Some(workspace_id) = selected
-                && (before.is_none() || Some(&workspace_id) != last_selected.as_ref())
-            {
-                send(
-                    &mut writer,
-                    &RendererEvent::Select {
-                        workspace_id: workspace_id.clone(),
-                    },
-                )?;
-                last_selected = Some(workspace_id);
-            }
-        }
-        if !primed {
-            if !poll(Duration::from_millis(16)).context("poll terminal input")? {
                 continue;
             }
-            if let Event::Key(key) = read().context("read terminal input")?
-                && is_occupancy_ctrl_c(key)
-            {
-                let _ = send(&mut writer, &RendererEvent::Quit);
-                running = false;
+            ParentBatch::Messages(messages) => {
+                for message in messages {
+                    primed = true;
+                    if matches!(message, ParentMessage::Shutdown) {
+                        running = false;
+                        break;
+                    }
+                    let before = state.selected_workspace_id().map(str::to_owned);
+                    let terminal_healthy = matches!(message, ParentMessage::TerminalOutput { .. });
+                    let should_reconnect = matches!(
+                        &message,
+                        ParentMessage::Error {
+                            phase,
+                            retryable: true,
+                            ..
+                        } if phase == "workspace-control-terminal"
+                    ) && state.session_id.is_some()
+                        && reconnect_attempts < 3;
+                    state.apply(message);
+                    let sequences = state.take_osc52();
+                    if !sequences.is_empty()
+                        && write_osc52_passthrough(&mut std::io::stdout(), &sequences).is_err()
+                    {
+                        state.mark_osc52_passthrough_failed();
+                    }
+                    if terminal_healthy {
+                        reconnect_attempts = 0;
+                    } else if should_reconnect {
+                        reconnect_attempts += 1;
+                        send(&mut writer, &RendererEvent::TerminalReconnect)?;
+                    }
+                    let selected = state.selected_workspace_id().map(str::to_owned);
+                    if state.should_emit_workspace_select()
+                        && let Some(workspace_id) = selected
+                        && (before.is_none() || Some(&workspace_id) != last_selected.as_ref())
+                    {
+                        send(
+                            &mut writer,
+                            &RendererEvent::Select {
+                                workspace_id: workspace_id.clone(),
+                            },
+                        )?;
+                        last_selected = Some(workspace_id);
+                    }
+                }
+            }
+        }
+        if !running {
+            continue;
+        }
+        if !primed {
+            match take_pending_events(Duration::from_millis(16), &stop)? {
+                TerminalDrain::Empty => {}
+                TerminalDrain::Ended => running = false,
+                TerminalDrain::Events(events) => {
+                    for event in events {
+                        if let Event::Key(key) = event
+                            && is_occupancy_ctrl_c(key)
+                        {
+                            let _ = send(&mut writer, &RendererEvent::Quit);
+                            running = false;
+                        }
+                    }
+                }
             }
             continue;
         }
@@ -291,10 +286,14 @@ fn main() -> Result<()> {
             .draw(|frame| render(frame, &state))
             .context("render Workspace control TUI")?;
 
-        let events = take_pending_events(Duration::from_millis(16))?;
-        if events.is_empty() {
-            continue;
-        }
+        let events = match take_pending_events(Duration::from_millis(16), &stop)? {
+            TerminalDrain::Empty => continue,
+            TerminalDrain::Ended => {
+                running = false;
+                continue;
+            }
+            TerminalDrain::Events(events) => events,
+        };
         let skip_mouse = drop_mouse_when_typing(&events);
         for event in events {
             if skip_mouse && matches!(event, Event::Mouse(_)) {
