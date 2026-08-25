@@ -17,6 +17,7 @@ import {
   Project,
   ProjectId,
   ProjectName,
+  ProjectByIdSpec,
   ProjectRepositoryBinding,
   ProjectRepositoryBindingId,
   RepositoryIdentity,
@@ -865,7 +866,7 @@ describe("Agent Workspace open preflight", () => {
 
     const { service } = await fixture({
       projectFinder: async (_context, spec) => {
-        const id = "id" in spec ? spec.id.value : undefined;
+        const id = spec instanceof ProjectByIdSpec ? spec.id.value : undefined;
         return id === "prj_replacement" ? replacement : null;
       },
       initializerFactory: ({ repositoryBindings }) => ({
