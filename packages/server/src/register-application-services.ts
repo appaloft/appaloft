@@ -115,6 +115,9 @@ import {
   COMMUNITY_OCCUPANCY_GROK_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_GROK_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_GROK_VERSION,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_DIGEST,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
+  COMMUNITY_OCCUPANCY_OMP_VERSION,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
@@ -758,6 +761,8 @@ import {
   WorkspaceCollaborationService,
   type WorkspaceOpenCredentialAdmissionPort,
   type WorkspaceOpenEntryRepository,
+  type OccupancyAgentRepository,
+
   type WorkspaceOpenMcpAdmissionPort,
   type WorkspaceOpenPlacementPort,
   type WorkspaceOpenSourceCredentialProviderPort,
@@ -3626,9 +3631,9 @@ export function registerApplicationServices(
           new CommandSandboxAgentHarness(sandboxes, {
             key: "omp",
             templateId: "aht_omp_managed_v1",
-            sandboxTemplateId: COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
-            version: COMMUNITY_OCCUPANCY_PI_VERSION,
-            templateDigest: COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
+            sandboxTemplateId: COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
+            version: COMMUNITY_OCCUPANCY_OMP_VERSION,
+            templateDigest: COMMUNITY_OCCUPANCY_OMP_TEMPLATE_DIGEST,
             run: { argv: ["omp"] },
             attach: {
               transport: "managed-terminal",
@@ -3636,6 +3641,7 @@ export function registerApplicationServices(
               sessionRecovery: "managed-run-lineage",
             },
             healthcheck: { kind: "process" },
+            persistentPaths: ["/workspace/.omp"],
           }),
           new CommandSandboxAgentHarness(sandboxes, {
             key: "codex",
@@ -4202,6 +4208,10 @@ export function registerApplicationServices(
         entries: dependencyContainer.resolve<WorkspaceOpenEntryRepository>(
           tokens.workspaceOpenEntryRepository,
         ),
+        occupancyAgents: dependencyContainer.resolve<OccupancyAgentRepository>(
+          tokens.occupancyAgentRepository,
+        ),
+
         ...(dependencyContainer.isRegistered(tokens.workspaceOpenSourceCredentialProvider, true)
           ? {
               sourceCredentials:

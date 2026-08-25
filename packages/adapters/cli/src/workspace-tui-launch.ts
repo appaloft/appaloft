@@ -10,6 +10,24 @@ const maxProtocolLineBytes = 1_048_576;
 const rendererConnectTimeoutMs = 5_000;
 const rendererExitTimeoutMs = 1_000;
 
+export type OccupancyTuiStdin = {
+  pause?(): void;
+  resume?(): void;
+  setRawMode?(enabled: boolean): void;
+};
+
+/** Parent and TUI inherit the same TTY. A flowing parent stdin steals every other key. */
+export function pauseParentStdinForOccupancyTui(
+  stdin: OccupancyTuiStdin = process.stdin,
+): () => void {
+  stdin.pause?.();
+  stdin.setRawMode?.(false);
+  return () => {
+    stdin.pause?.();
+  };
+}
+
+
 export interface WorkspaceControlRendererProcess {
   readonly exited: Promise<void>;
   terminate(): void;
@@ -508,6 +526,7 @@ export async function openLoopbackWorkspaceControlRenderer(
   });
 
   let process: WorkspaceControlRendererProcess | undefined;
+  const releaseParentStdin = pauseParentStdinForOccupancyTui();
   try {
     const port = await listen(server);
     process = await input.launch({ host: loopbackHost, port, token });
@@ -528,7 +547,6 @@ export async function openLoopbackWorkspaceControlRenderer(
       rendererConnectTimeoutMs,
       rendererError("Renderer did not connect", "connect-timeout"),
     );
-    // Bun's Process type is not NodeJS.Process; ownership is a session Symbol flag.
     const rendererProcess = process as unknown as { [key: symbol]: unknown };
     rendererProcess[Symbol.for("appaloft.occupancyRendererOwned")] = true;
     let closed = false;
@@ -553,17 +571,20 @@ export async function openLoopbackWorkspaceControlRenderer(
         } catch {
           process?.terminate();
         } finally {
+          releaseParentStdin();
           socket.destroy();
           await closeServer(server);
         }
       },
     };
   } catch (error) {
+    releaseParentStdin();
     process?.terminate();
     authenticatedSocket?.destroy();
     await closeServer(server);
     throw error;
   }
+
 }
 
 function hasWorkspaceControlTuiCrate(root: string): boolean {

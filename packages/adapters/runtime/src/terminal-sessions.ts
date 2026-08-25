@@ -790,12 +790,16 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
         subprocess = terminal;
         cleanup = terminal.cleanup ?? (async () => {});
       } catch (error) {
+        const detail = error instanceof Error ? error.message.trim() : String(error).trim();
         return err(
-          domainError.terminalSessionFailed("Failed to start Sandbox terminal session", {
-            phase: "terminal-session-sandbox-start",
-            sandboxId: request.scope.sandboxId,
-            message: error instanceof Error ? error.message : String(error),
-          }),
+          domainError.terminalSessionFailed(
+            detail || "Failed to start Sandbox terminal session",
+            {
+              phase: "terminal-session-sandbox-start",
+              sandboxId: request.scope.sandboxId,
+              ...(detail ? { message: detail } : {}),
+            },
+          ),
         );
       }
     } else {

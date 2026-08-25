@@ -40,6 +40,8 @@ export * from "./preview-feedback-recorder";
 export * from "./preview-policy-decision-projection";
 export * from "./preview-policy-repository";
 export * from "./process-attempt-journal";
+export * from "./occupancy-agent-repository";
+
 export * from "./project-deletion-blocker-reader";
 export * from "./project-environment-overview-read-model";
 export * from "./project-read-model";

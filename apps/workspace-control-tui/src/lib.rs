@@ -6,7 +6,10 @@ pub use home::{
     render_occupancy_home,
 };
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
+
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -954,9 +957,9 @@ pub struct OccupancyPrepareStep {
 
 fn default_prepare_steps() -> Vec<OccupancyPrepareStep> {
     [
-        ("credential", "Checking login"),
-        ("skills", "Preparing skills"),
-        ("disk", "Preparing disk"),
+        ("credential", "Using your credential on the agent"),
+        ("skills", "Including your skills"),
+        ("disk", "Waking the agent"),
     ]
     .into_iter()
     .map(|(id, label)| OccupancyPrepareStep {
@@ -967,18 +970,33 @@ fn default_prepare_steps() -> Vec<OccupancyPrepareStep> {
     .collect()
 }
 
-fn infer_prepare_step_id(message: &str) -> &'static str {
+fn infer_prepare_step_id(message: &str) -> Option<&'static str> {
     let lower = message.to_ascii_lowercase();
     if lower.contains("skill") {
-        "skills"
-    } else if lower.contains("login") || lower.contains("server") || lower.contains("credential") {
-        "credential"
+        Some("skills")
+    } else if lower.contains("using your")
+        || lower.contains("credential")
+        || lower.contains("opencode login")
+    {
+        Some("credential")
+    } else if lower.contains("waking")
+        || lower.contains("woke")
+        || lower.contains("finalizing")
+        || lower.contains("work is on its disk")
+        || lower.contains("preparing disk")
+    {
+        Some("disk")
     } else {
-        "disk"
+        None
     }
 }
 
-fn apply_prepare_step(steps: &mut [OccupancyPrepareStep], step_id: &str, status: Option<&str>) {
+fn apply_prepare_step(
+    steps: &mut [OccupancyPrepareStep],
+    step_id: &str,
+    status: Option<&str>,
+    label: Option<&str>,
+) {
     let next_status = match status {
         Some("failed") => "failed",
         Some("retrying") => "retrying",
@@ -989,12 +1007,18 @@ fn apply_prepare_step(steps: &mut [OccupancyPrepareStep], step_id: &str, status:
     for step in steps.iter_mut() {
         if step.id == step_id {
             step.status = next_status.to_owned();
+            if let Some(label) = label {
+                if !label.is_empty() {
+                    step.label = label.to_owned();
+                }
+            }
             reached = true;
         } else if !reached && step.status != "failed" {
             step.status = "done".to_owned();
         }
     }
 }
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct OccupancyLoading {
@@ -1057,6 +1081,10 @@ pub struct AppState {
     pub wrap: bool,
     pub help_open: bool,
     pub home: HomeState,
+    pub occupancy_surface: bool,
+    pub entered_from_home: bool,
+
+
     pub open_panes: Vec<OpenPane>,
     pub pending_osc52: Vec<String>,
     pub osc52_carry: String,
@@ -1095,6 +1123,10 @@ impl Default for AppState {
             wrap: false,
             help_open: false,
             home: HomeState::default(),
+            occupancy_surface: false,
+            entered_from_home: false,
+
+
             open_panes: Vec::new(),
             pending_osc52: Vec::new(),
             osc52_carry: String::new(),
@@ -1157,8 +1189,16 @@ impl AppState {
                 status,
             } => {
                 self.loading.active = true;
-                let step_id = step.unwrap_or_else(|| infer_prepare_step_id(&message).to_owned());
-                apply_prepare_step(&mut self.loading.steps, &step_id, status.as_deref());
+                if let Some(step_id) = step.or_else(|| {
+                    infer_prepare_step_id(&message).map(str::to_owned)
+                }) {
+                    apply_prepare_step(
+                        &mut self.loading.steps,
+                        &step_id,
+                        status.as_deref(),
+                        Some(&message),
+                    );
+                }
                 self.status_line = message;
             }
             ParentMessage::Loading {
@@ -1167,7 +1207,9 @@ impl AppState {
                 project,
             } => {
                 self.loading.active = true;
+                self.occupancy_surface = true;
                 self.home.visible = false;
+
                 if let Some(collapsed) = collapsed {
                     self.loading.collapsed = collapsed;
                 }
@@ -1194,10 +1236,14 @@ impl AppState {
                     self.loading.project = occupancy_display_project(&project);
                 }
                 if home {
+                    self.occupancy_surface = true;
+                    self.entered_from_home = true;
                     self.home.visible = true;
                     self.loading.active = false;
                     self.home.error = None;
                 }
+
+
                 if !vendors.is_empty() {
                     self.home.apply_vendors(vendors, selected_vendor.as_deref());
                 } else if let Some(selected) = selected_vendor {
@@ -1271,16 +1317,24 @@ impl AppState {
                 if let Some(session_id) = self.session_id.as_deref() {
                     self.open_panes.retain(|pane| pane.session_id != session_id);
                 }
-                self.agent_focused = false;
-                self.focus_mode = false;
                 self.received_terminal_output = false;
                 self.session_id = None;
                 self.runtime_id = None;
-                self.status_line = match exit_code {
-                    Some(code) => format!("Agent terminal closed: {reason} ({code})"),
-                    None => format!("Agent terminal closed: {reason}"),
-                };
+                if self.entered_from_home {
+                    self.return_to_occupancy_home();
+                } else if self.occupancy_surface {
+                    self.agent_focused = false;
+                } else {
+                    self.agent_focused = false;
+                    self.focus_mode = false;
+                    self.status_line = match exit_code {
+                        Some(code) => format!("Agent terminal closed: {reason} ({code})"),
+                        None => format!("Agent terminal closed: {reason}"),
+                    };
+                }
             }
+
+
             ParentMessage::DeliveryComplete { workspace_id } => {
                 self.delivery_busy = false;
                 self.delivery_form = None;
@@ -1350,7 +1404,22 @@ impl AppState {
         self.agent_focused = false;
     }
 
+    pub fn return_to_occupancy_home(&mut self) {
+        self.agent_focused = false;
+        self.focus_mode = false;
+        self.loading.active = false;
+        self.loading.collapsed = false;
+        self.help_open = false;
+        self.home.visible = true;
+        self.home.error = None;
+        self.status_line = "Appaloft Cloud Agents".to_owned();
+    }
+
     pub fn show_agents_list(&mut self) {
+        if self.occupancy_surface {
+            self.return_to_occupancy_home();
+            return;
+        }
         self.agent_focused = false;
         self.focus_mode = false;
         self.loading.active = false;
@@ -1358,6 +1427,7 @@ impl AppState {
         self.help_open = false;
         self.status_line = "Appaloft Cloud Agents".to_owned();
     }
+
 
     fn remember_open_pane(&mut self, workspace_id: &str, runtime_id: &str, session_id: &str) {
         if let Some(existing) = self
@@ -2070,9 +2140,6 @@ pub fn occupancy_key_binding(
         if matches!(key.code, KeyCode::Esc) && shift {
             return OccupancyKeyBinding::StopTyping;
         }
-        if occupancy_bare_char(key, 'x') {
-            return OccupancyKeyBinding::ShowAgentsList;
-        }
         return OccupancyKeyBinding::PassToAgent;
     }
     if matches!(key.code, KeyCode::Char('?')) && !ctrl {
@@ -2156,6 +2223,24 @@ pub fn occupancy_ignored_signals() -> &'static [i32] {
     &[signal_hook::consts::SIGINT]
 }
 
+pub fn occupancy_agent_accepts_key(key: KeyEvent) -> bool {
+    matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
+}
+
+pub fn drop_mouse_when_typing(events: &[Event]) -> bool {
+    events
+        .iter()
+        .any(|event| matches!(event, Event::Key(_) | Event::Paste(_)))
+}
+
+pub fn encode_agent_key_burst(keys: impl IntoIterator<Item = KeyEvent>) -> String {
+    keys.into_iter()
+        .filter(|key| occupancy_agent_accepts_key(*key))
+        .filter_map(terminal_key_bytes)
+        .collect()
+}
+
+
 pub fn terminal_key_bytes(key: KeyEvent) -> Option<String> {
     if key.modifiers.contains(KeyModifiers::CONTROL)
         && let KeyCode::Char(character) = key.code
@@ -2185,6 +2270,12 @@ pub fn terminal_key_bytes(key: KeyEvent) -> Option<String> {
         KeyCode::F(number) => Some(format!("\x1b[{}~", 10 + number)),
         _ => None,
     }
+}
+
+/// IME commits and clipboard pastes arrive as host `Event::Paste`.
+/// Nested Grok/Claude/OpenCode inputs swallow CSI 200/201, so forward raw UTF-8.
+pub fn terminal_agent_paste_bytes(data: &str) -> String {
+    data.to_owned()
 }
 
 pub fn terminal_mouse_bytes(event: MouseEvent) -> Option<String> {
@@ -2653,7 +2744,10 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         );
         return;
     }
-    if state.home.visible && !state.agent_focused && !state.focus_mode {
+    if (state.home.visible || state.occupancy_surface)
+        && !state.agent_focused
+        && !state.focus_mode
+    {
         render_occupancy_home(frame, &state.home, body);
         frame.render_widget(
             Paragraph::new(home_footer(&state.home)).style(Style::default().fg(Color::DarkGray)),
@@ -2661,6 +2755,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         );
         return;
     }
+
     if state.focus_mode {
         render_terminal(
             frame,
@@ -3383,9 +3478,9 @@ mod tests {
     fn first_screen_step_columns(out: &str) -> (Option<usize>, Option<usize>, Option<usize>) {
         let column = |label: &str| out.lines().find_map(|line| line.find(label));
         (
-            column("Checking login"),
-            column("Preparing skills"),
-            column("Preparing disk"),
+            column("Using your credential on the agent"),
+            column("Including your skills"),
+            column("Waking the agent"),
         )
     }
 
@@ -3438,19 +3533,19 @@ mod tests {
             "{out}"
         );
         assert_eq!(
-            out.matches("Checking login").count(),
+            out.matches("Using your credential on the agent").count(),
             1,
-            "Checking login must appear once:\n{out}"
+            "Using your credential must appear once:\n{out}"
         );
         assert_eq!(
-            out.matches("Preparing skills").count(),
+            out.matches("Including your skills").count(),
             1,
-            "Preparing skills must appear once:\n{out}"
+            "Including your skills must appear once:\n{out}"
         );
         assert_eq!(
-            out.matches("Preparing disk").count(),
+            out.matches("Waking the agent").count(),
             1,
-            "Preparing disk must appear once:\n{out}"
+            "Waking the agent must appear once:\n{out}"
         );
         let (login, skills, disk) = first_screen_step_columns(out);
         assert_eq!(
@@ -3473,14 +3568,14 @@ mod tests {
         assert!(state.loading.collapsed);
         state.apply(ParentMessage::HelloOk);
         state.apply(ParentMessage::Progress {
-            message: "Preparing disk on hostinger…".to_owned(),
+            message: "Waking the agent…".to_owned(),
             step: None,
             status: None,
         });
         state.apply(ParentMessage::Workspaces {
             workspaces: Vec::new(),
         });
-        assert_eq!(state.status_line, "Preparing disk on hostinger…");
+        assert_eq!(state.status_line, "Waking the agent…");
         assert_eq!(
             state
                 .loading
@@ -3529,9 +3624,9 @@ mod tests {
         assert_no_bare_q_quit(&out);
         assert!(!out.contains("^q quit"), "{out}");
         assert!(!out.contains("^c leave"), "{out}");
-        assert!(out.contains("Checking login"), "{out}");
-        assert!(out.contains("Preparing skills"), "{out}");
-        assert!(out.contains("Preparing disk"), "{out}");
+        assert!(out.contains("Using your credential on the agent"), "{out}");
+        assert!(out.contains("Including your skills"), "{out}");
+        assert!(out.contains("Waking the agent"), "{out}");
         assert_first_screen_one_prepare_column(&out);
         assert!(
             !state.focus_mode,
@@ -3549,17 +3644,17 @@ mod tests {
             project: Some("hello-static".to_owned()),
         });
         state.apply(ParentMessage::Progress {
-            message: "Checking login…".to_owned(),
+            message: "Using your credential on the agent…".to_owned(),
             step: None,
             status: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Preparing skills…".to_owned(),
+            message: "Including your skills…".to_owned(),
             step: Some("skills".to_owned()),
             status: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Preparing disk on hostinger…".to_owned(),
+            message: "Waking the agent…".to_owned(),
             step: Some("disk".to_owned()),
             status: None,
         });
@@ -3581,7 +3676,7 @@ mod tests {
         assert!(out.contains("restore the tree"), "{out}");
         assert_first_screen_one_prepare_column(&out);
         assert!(
-            !out.contains("Preparing skills…") || out.matches("Preparing skills").count() == 1,
+            !out.contains("Preparing skills…") || out.matches("Including your skills").count() == 1,
             "parent-bridge progress must not add a second Preparing skills stream:\n{out}"
         );
         assert!(!state.focus_mode);
@@ -3677,17 +3772,17 @@ mod tests {
             "first paint is not a box-titled inner clip:\n{out}"
         );
         state.apply(ParentMessage::Progress {
-            message: "Checking login…".to_owned(),
+            message: "Using your credential on the agent…".to_owned(),
             step: Some("credential".to_owned()),
             status: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Preparing skills…".to_owned(),
+            message: "Including your skills…".to_owned(),
             step: Some("skills".to_owned()),
             status: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Preparing disk on hostinger…".to_owned(),
+            message: "Waking the agent…".to_owned(),
             step: Some("disk".to_owned()),
             status: None,
         });
@@ -3774,7 +3869,7 @@ mod tests {
         let x = KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE);
         assert_eq!(
             occupancy_key_binding(x, true, true),
-            OccupancyKeyBinding::ShowAgentsList
+            OccupancyKeyBinding::PassToAgent
         );
         assert_eq!(
             occupancy_key_binding(x, false, true),
@@ -3927,9 +4022,9 @@ mod tests {
                 .contains("occupancy")
         );
         for (_, label) in [
-            ("credential", "Checking login"),
-            ("skills", "Preparing skills"),
-            ("disk", "Preparing disk"),
+            ("credential", "Using your credential on the agent"),
+            ("skills", "Including your skills"),
+            ("disk", "Waking the agent"),
         ] {
             assert!(!label.to_ascii_lowercase().contains("occupancy"), "{label}");
         }
@@ -3994,12 +4089,12 @@ mod tests {
             project: Some("hello-static".to_owned()),
         });
         state.apply(ParentMessage::Progress {
-            message: "Checking login…".to_owned(),
+            message: "Using your credential on the agent…".to_owned(),
             step: None,
             status: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Preparing disk on hostinger…".to_owned(),
+            message: "Waking the agent…".to_owned(),
             step: None,
             status: None,
         });
@@ -4027,9 +4122,9 @@ mod tests {
                 .map(|step| (step.label.as_str(), step.status.as_str()))
                 .collect::<Vec<_>>(),
             vec![
-                ("Checking login", "done"),
-                ("Preparing skills", "done"),
-                ("Preparing disk", "active")
+                ("Using your credential on the agent…", "done"),
+                ("Including your skills", "done"),
+                ("Waking the agent…", "active")
             ]
         );
         let backend = ratatui::backend::TestBackend::new(100, 24);
@@ -4041,9 +4136,9 @@ mod tests {
         assert!(out.contains("preparing the agent"), "{out}");
         assert!(out.contains("Appaloft Cloud Agents"), "{out}");
         assert!(out.contains("hello-static"), "{out}");
-        assert!(out.contains("Checking login"), "{out}");
-        assert!(out.contains("Preparing skills"), "{out}");
-        assert!(out.contains("Preparing disk"), "{out}");
+        assert!(out.contains("Using your credential on the agent"), "{out}");
+        assert!(out.contains("Including your skills"), "{out}");
+        assert!(out.contains("Waking the agent"), "{out}");
         assert_first_screen_one_prepare_column(&out);
         assert!(out.contains('✓'), "{out}");
         assert!(out.contains("restore the tree"), "{out}");
@@ -4094,22 +4189,22 @@ mod tests {
             project: Some("appaloft-clo-cloud".to_owned()),
         });
         state.apply(ParentMessage::Progress {
-            message: "Checking login…".to_owned(),
+            message: "Using your credential on the agent…".to_owned(),
             step: Some("credential".to_owned()),
             status: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Preparing skills…".to_owned(),
+            message: "Including your skills…".to_owned(),
             step: Some("skills".to_owned()),
             status: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Preparing disk on hostinger…".to_owned(),
+            message: "Waking the agent…".to_owned(),
             step: Some("disk".to_owned()),
             status: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Preparing disk on hostinger…".to_owned(),
+            message: "Waking the agent…".to_owned(),
             step: Some("disk".to_owned()),
             status: Some("retrying".to_owned()),
         });
@@ -4121,9 +4216,9 @@ mod tests {
                 .map(|step| (step.label.as_str(), step.status.as_str()))
                 .collect::<Vec<_>>(),
             vec![
-                ("Checking login", "done"),
-                ("Preparing skills", "done"),
-                ("Preparing disk", "retrying")
+                ("Using your credential on the agent…", "done"),
+                ("Including your skills…", "done"),
+                ("Waking the agent…", "retrying")
             ]
         );
         let backend = ratatui::backend::TestBackend::new(80, 24);
@@ -4133,10 +4228,10 @@ mod tests {
             .expect("draw retrying disk");
         let retrying = buffer_plain(&terminal);
         assert_first_screen_one_prepare_column(&retrying);
-        assert!(retrying.contains("Preparing disk"), "{retrying}");
+        assert!(retrying.contains("Waking the agent"), "{retrying}");
         assert!(!retrying.contains('!'), "{retrying}");
         state.apply(ParentMessage::Progress {
-            message: "Preparing disk on hostinger…".to_owned(),
+            message: "Waking the agent…".to_owned(),
             step: Some("disk".to_owned()),
             status: Some("failed".to_owned()),
         });
@@ -4159,9 +4254,9 @@ mod tests {
             !failed.lines().any(line_clips_agents_title),
             "title must not clip to Appaloft Cloud Agen:\n{failed}"
         );
-        assert_eq!(failed.matches("Checking login").count(), 1, "{failed}");
-        assert_eq!(failed.matches("Preparing skills").count(), 1, "{failed}");
-        assert_eq!(failed.matches("Preparing disk").count(), 1, "{failed}");
+        assert_eq!(failed.matches("Using your credential on the agent").count(), 1, "{failed}");
+        assert_eq!(failed.matches("Including your skills").count(), 1, "{failed}");
+        assert_eq!(failed.matches("Waking the agent").count(), 1, "{failed}");
         assert!(failed.contains('!'), "{failed}");
         assert!(
             !failed.to_ascii_lowercase().contains("occupancy"),
@@ -4411,6 +4506,35 @@ mod tests {
     }
 
     #[test]
+    fn ws_tui_focus_005_helloworld_burst_reaches_the_agent() {
+        let keys = "helloworld".chars().map(|character| {
+            let mut key = KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE);
+            key.kind = KeyEventKind::Press;
+            key
+        });
+        assert_eq!(encode_agent_key_burst(keys), "helloworld");
+        let mut repeat = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE);
+        repeat.kind = KeyEventKind::Repeat;
+        assert!(occupancy_agent_accepts_key(repeat));
+        assert_eq!(terminal_key_bytes(repeat), Some("w".to_owned()));
+        let mouse = Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 4,
+            row: 2,
+            modifiers: KeyModifiers::NONE,
+        });
+        let typed = Event::Key(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE));
+        assert!(drop_mouse_when_typing(&[
+            mouse.clone(),
+            typed,
+            mouse.clone()
+        ]));
+        assert!(!drop_mouse_when_typing(&[mouse]));
+
+    }
+
+
+    #[test]
     fn code_tui_ca_keys_map_sleep_wake_delete_and_say_unavailable() {
         let n = KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE);
         let s = KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE);
@@ -4650,6 +4774,16 @@ mod tests {
             terminal_key_bytes(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)),
             Some("\x1b[A".to_owned())
         );
+        assert_eq!(
+            terminal_key_bytes(KeyEvent::new(KeyCode::Char('西'), KeyModifiers::NONE)),
+            Some("西".to_owned())
+        );
+        assert_eq!(
+            terminal_key_bytes(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE)),
+            Some("x".to_owned())
+        );
+        assert_eq!(terminal_agent_paste_bytes("西安项目"), "西安项目");
+        assert!(!terminal_agent_paste_bytes("西安").contains("\u{1b}[200~"));
         assert_eq!(
             terminal_mouse_bytes(MouseEvent {
                 kind: MouseEventKind::Down(MouseButton::Left),
@@ -5594,4 +5728,73 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn occupancy_home_session_end_returns_to_railway_home_not_three_pane() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Chrome {
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: Some("appaloft-cloud".to_owned()),
+            home: true,
+            vendors: vec!["codex".to_owned(), "grok".to_owned()],
+            selected_vendor: Some("codex".to_owned()),
+            targets: Vec::new(),
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        state.apply(ParentMessage::TerminalClosed {
+            reason: "source-ended".to_owned(),
+            exit_code: Some(0),
+        });
+        assert!(state.entered_from_home);
+        assert!(state.home.visible);
+        assert_eq!(state.home.selected_vendor(), "codex");
+        let backend = ratatui::backend::TestBackend::new(100, 28);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw home after home-launched session");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("CLOUD AGENTS"), "{out}");
+        assert!(out.contains("codex"), "{out}");
+        assert!(
+            !out.contains("Select a Workspace to load bounded detail."),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn occupancy_code_session_end_does_not_open_home_prompt() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Loading {
+            collapsed: Some(true),
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: Some("appaloft-cloud".to_owned()),
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        state.apply(ParentMessage::TerminalClosed {
+            reason: "source-ended".to_owned(),
+            exit_code: Some(0),
+        });
+        assert!(state.occupancy_surface);
+        assert!(!state.entered_from_home);
+        assert!(!state.home.visible);
+        assert!(state.focus_mode);
+        let backend = ratatui::backend::TestBackend::new(100, 28);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw last agent frame");
+        let out = buffer_plain(&terminal);
+        assert!(!out.contains("What should we build today?"), "{out}");
+        assert!(!out.contains("New Session"), "{out}");
+    }
+
 }

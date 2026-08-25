@@ -9,6 +9,9 @@ import {
   COMMUNITY_OCCUPANCY_GROK_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_GROK_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_GROK_VERSION,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_DIGEST,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
+  COMMUNITY_OCCUPANCY_OMP_VERSION,
   COMMUNITY_OCCUPANCY_OPENCODE_LIMITS,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
@@ -24,6 +27,8 @@ import {
   CreateSandboxCommand,
   createExecutionContext,
   IssueSandboxAgentAttachAccessCommand,
+  InMemoryOccupancyAgentRepository,
+
   ListProjectsQuery,
   ListSandboxesQuery,
   ListServersQuery,
@@ -91,6 +96,14 @@ const FOLDER_LOCAL_GROK_HARNESS = {
   sandboxTemplateDigest: COMMUNITY_OCCUPANCY_GROK_TEMPLATE_DIGEST,
   limits: COMMUNITY_OCCUPANCY_OPENCODE_LIMITS,
 } as const;
+const FOLDER_LOCAL_OMP_HARNESS = {
+  harnessKey: "omp",
+  harnessTemplateId: "aht_omp_managed_v1",
+  sandboxTemplateId: COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
+  sandboxTemplateVersion: COMMUNITY_OCCUPANCY_OMP_VERSION,
+  sandboxTemplateDigest: COMMUNITY_OCCUPANCY_OMP_TEMPLATE_DIGEST,
+  limits: COMMUNITY_OCCUPANCY_OPENCODE_LIMITS,
+} as const;
 
 function folderLocalHarnessForProfile(profile?: string) {
   if (profile === COMMUNITY_OCCUPANCY_PI_PROFILE_ID || profile === occupancyRemoteProfileId("pi")) {
@@ -104,6 +117,9 @@ function folderLocalHarnessForProfile(profile?: string) {
   }
   if (profile === occupancyRemoteProfileId("grok")) {
     return FOLDER_LOCAL_GROK_HARNESS;
+  }
+  if (profile === occupancyRemoteProfileId("omp")) {
+    return FOLDER_LOCAL_OMP_HARNESS;
   }
   return FOLDER_LOCAL_OPENCODE_HARNESS;
 }
@@ -245,8 +261,10 @@ export async function executeFolderLocalWorkspaceOpen(input: {
     {
       skipSourceMaterialization: true,
       ...(providerKey ? { placementProviderKey: providerKey } : {}),
+      ...(resume?.agentId ? { preferredAgentId: resume.agentId } : {}),
     },
   );
+
   if (opened.isOk()) {
     try {
       await writeFolderLocalResume(
@@ -254,6 +272,8 @@ export async function executeFolderLocalWorkspaceOpen(input: {
           repositoryIdentity: input.command.input.repositoryIdentity,
           workspaceId: opened.value.workspaceId,
           runtimeId: opened.value.agent.runtimeId,
+          ...(opened.value.agentId ? { agentId: opened.value.agentId } : {}),
+          ...(opened.value.name ? { name: opened.value.name } : {}),
           ...(input.command.input.targetServerId
             ? { targetServerId: input.command.input.targetServerId }
             : {}),
@@ -261,6 +281,7 @@ export async function executeFolderLocalWorkspaceOpen(input: {
         },
         resumeStore,
       );
+
     } catch {
       // Resume cache is an accelerator. Occupy already succeeded.
     }
@@ -433,6 +454,8 @@ function createFolderLocalRemoteOpenDependencies(input: {
           },
         }),
     },
+    occupancyAgents: new InMemoryOccupancyAgentRepository(),
+
     entries: {
       findByWorkspaceIds: async () => new Map(),
       findByWorkspaceId: async () => undefined,

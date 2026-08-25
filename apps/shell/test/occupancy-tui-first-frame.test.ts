@@ -29,10 +29,9 @@ describe("occupancy TUI first frame", () => {
     const frame = occupancyFirstFrameBytes(24, 80);
     expect(frame.startsWith(OCCUPANCY_ALT_SCREEN)).toBeTrue();
     expect(frame).toContain(OCCUPANCY_FIRST_FRAME_CHROME);
-    expect(frame).toContain(OCCUPANCY_FIRST_FRAME_TITLE);
-    expect(frame).toContain("Checking login");
-    expect(frame).toContain("Preparing skills");
-    expect(frame).toContain("Preparing disk");
+    expect(frame).toContain("Using your credential on the agent");
+    expect(frame).toContain("Including your skills");
+    expect(frame).toContain("Waking the agent");
     expect(frame).toContain("╭");
     expect(frame).toContain("╰");
     expect(frame).not.toContain("\x1b[11;");
@@ -46,7 +45,7 @@ describe("occupancy TUI first frame", () => {
     expect(written.startsWith(OCCUPANCY_ALT_SCREEN)).toBeTrue();
     expect(written).toContain(OCCUPANCY_FIRST_FRAME_CHROME);
     expect(written).toContain(OCCUPANCY_FIRST_FRAME_TITLE);
-    expect(written).toContain("Preparing disk");
+    expect(written).toContain("Waking the agent");
     expect(written).not.toMatch(/occupancy/iu);
   });
 
@@ -66,7 +65,7 @@ describe("occupancy TUI first frame", () => {
       join(import.meta.dir, "../src/occupancy-cli-progress.ts"),
       "utf8",
     );
-    const firstFrame = source.indexOf("enterOccupancyAltScreen()");
+    const firstFrame = source.indexOf("SHELL_OCCUPANCY_PROGRESS.loadingProject");
     const launchImport = source.indexOf("@appaloft/adapter-cli/workspace-tui-launch");
     const reflectImport = source.indexOf('import("reflect-metadata")');
     const runImport = source.indexOf('import("./run")');

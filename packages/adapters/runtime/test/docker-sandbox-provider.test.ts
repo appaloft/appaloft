@@ -12,7 +12,7 @@ import {
 } from "../src/docker-sandbox-provider";
 
 class CapturingRunner implements SandboxDockerCommandRunner {
-  readonly calls: Array<{ argv: readonly string[]; stdin?: Uint8Array }> = [];
+  readonly calls: Array<{ argv: readonly string[]; stdin?: Uint8Array; timeoutMs?: number }> = [];
   readonly terminalCalls: Array<{
     argv: readonly string[];
     initialRows: number;
@@ -34,12 +34,17 @@ class CapturingRunner implements SandboxDockerCommandRunner {
   processSnapshot = "";
   portableRecoveryDigest = "b".repeat(64);
   snapshotImageIdentity = "ssn_demo|sbx_demo";
+  occupancyBinaryPresent = false;
 
   async run(
     argv: readonly string[],
     input: { stdin?: Uint8Array; timeoutMs?: number } = {},
   ): Promise<SandboxDockerCommandResult> {
-    this.calls.push({ argv: [...argv], ...(input.stdin ? { stdin: input.stdin.slice() } : {}) });
+    this.calls.push({
+      argv: [...argv],
+      ...(input.stdin ? { stdin: input.stdin.slice() } : {}),
+      ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+    });
     const command = argv.join(" ");
     if (
       this.concurrentRemoval &&
@@ -100,11 +105,11 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     if (command.startsWith("sha256sum --")) {
       return this.result(`${this.portableRecoveryDigest}  ${argv.at(-1)}\n`);
     }
-    if (
-      command.includes("appaloft.sandbox.base-image") &&
-      !command.includes("image inspect")
-    )
+    if (command.includes("appaloft.sandbox.base-image") && !command.includes("image inspect"))
       return this.result("\n");
+    if (command.includes("/usr/local/bin/omp") && command.includes("echo yes")) {
+      return this.result(this.occupancyBinaryPresent ? "yes\n" : "no\n");
+    }
     if (command.includes("inspect --format {{.Image}}"))
       return this.result(`sha256:${"a".repeat(64)}\n`);
     if (command.includes("inspect --format") && !command.includes("image inspect")) {
@@ -401,13 +406,42 @@ describe("DockerSandboxProvider", () => {
     expect(fetched[0]).toContain("oh-my-pi/releases/download/v18.0.3/omp-linux-x64");
     const install = runner.calls.find((call) => call.argv.includes("-i") && call.stdin);
     expect(new TextDecoder().decode(install?.stdin)).toBe("omp-binary");
+    expect(install?.timeoutMs).toBe(10 * 60 * 1_000);
     expect(runner.calls.some((call) => call.argv[1] === "cp")).toBe(false);
-    expect(runner.terminalCalls[0]?.argv.at(-1)).toBe("/var/tmp/appaloft-bin/omp");
+    expect(runner.terminalCalls[0]?.argv.at(-1)).toBe("/usr/local/bin/omp");
     expect(
       runner.calls.some((call) =>
         call.argv.some((value) => String(value).includes("/workspace/.omp/natives")),
       ),
     ).toBe(true);
+  });
+
+  test("[WS-REMOTE-VENDOR-204] skips occupancy omp download when reserved image already has the binary", async () => {
+    const runner = new CapturingRunner();
+    runner.occupancyBinaryPresent = true;
+    const fetched: string[] = [];
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      fetchImpl: (async (url: string) => {
+        fetched.push(String(url));
+        return { ok: false, status: 403, arrayBuffer: async () => new ArrayBuffer(0) } as Response;
+      }) as typeof fetch,
+    });
+    await provider.provision(request);
+    await provider.openTerminal({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      cwd: ".",
+      initialRows: 24,
+      initialCols: 80,
+      process: { argv: ["omp"] },
+    });
+    expect(fetched).toEqual([]);
+    expect(runner.calls.some((call) => call.argv.includes("-i") && Boolean(call.stdin))).toBe(
+      false,
+    );
+    expect(runner.terminalCalls[0]?.argv.at(-1)).toBe("/usr/local/bin/omp");
   });
 
   test("[SBX-RUNTIME-002] provisions a constrained gVisor container without shell interpolation", async () => {

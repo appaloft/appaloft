@@ -1,6 +1,8 @@
 import {
   isOccupancyHelpArgs,
+  reportOccupancyCliProgress,
   reportOccupancyCliStartupOnce,
+  SHELL_OCCUPANCY_PROGRESS,
   shouldPrintOccupancyLineProgress,
   shouldWarmOccupancyTui,
 } from "./occupancy-cli-progress";
@@ -86,7 +88,7 @@ if (command === "setup" && isHelpFlag(args)) {
 if (shouldPrintOccupancyLineProgress(args)) {
   reportOccupancyCliStartupOnce(args);
 } else if (shouldWarmOccupancyTui(args)) {
-  enterOccupancyAltScreen();
+  reportOccupancyCliProgress(SHELL_OCCUPANCY_PROGRESS.loadingProject);
   void import("@appaloft/adapter-cli/workspace-tui-launch")
     .then(({ warmupWorkspaceControlRenderer }) => warmupWorkspaceControlRenderer())
     .catch(() => {

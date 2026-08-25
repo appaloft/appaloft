@@ -13,9 +13,9 @@ use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
     ActionDecision, AppState, DeliveryDecision, DeliverySubmission, OCCUPANCY_FIRST_SCREEN_LAYOUT,
     OccupancyHomeKey, OccupancyKeyBinding, ParentMessage, RecoverySubmission, RendererEvent,
-    agent_area, is_occupancy_ctrl_c, occupancy_home_key, occupancy_key_binding,
-    occupancy_stop_signals, render, terminal_key_bytes, terminal_mouse_bytes,
-    write_osc52_passthrough,
+    agent_area, drop_mouse_when_typing, is_occupancy_ctrl_c, occupancy_agent_accepts_key,
+    occupancy_home_key, occupancy_key_binding, occupancy_stop_signals, render,
+    terminal_agent_paste_bytes, terminal_key_bytes, terminal_mouse_bytes, write_osc52_passthrough,
 };
 
 use crossterm::event::{
@@ -63,6 +63,18 @@ fn send(stream: &mut TcpStream, event: &RendererEvent) -> Result<()> {
     stream.write_all(b"\n").context("write renderer event")?;
     stream.flush().context("flush renderer event")
 }
+
+fn take_pending_events(first_wait: Duration) -> Result<Vec<Event>> {
+    if !poll(first_wait).context("poll terminal input")? {
+        return Ok(Vec::new());
+    }
+    let mut events = vec![read().context("read terminal input")?];
+    while poll(Duration::ZERO).context("drain terminal input")? {
+        events.push(read().context("read terminal input")?);
+    }
+    Ok(events)
+}
+
 
 fn send_delivery(
     stream: &mut TcpStream,
@@ -280,10 +292,17 @@ fn main() -> Result<()> {
             .draw(|frame| render(frame, &state))
             .context("render Workspace control TUI")?;
 
-        if !poll(Duration::from_millis(16)).context("poll terminal input")? {
+        let events = take_pending_events(Duration::from_millis(16))?;
+        if events.is_empty() {
             continue;
         }
-        match read().context("read terminal input")? {
+        let skip_mouse = drop_mouse_when_typing(&events);
+        for event in events {
+            if skip_mouse && matches!(event, Event::Mouse(_)) {
+                continue;
+            }
+            match event {
+
             Event::Key(key) if is_occupancy_ctrl_c(key) && state.ctrl_c_quits() => {
                 let _ = send(&mut writer, &RendererEvent::Quit);
                 running = false;
@@ -298,7 +317,7 @@ fn main() -> Result<()> {
             Event::Paste(data) if state.agent_focused => send(
                 &mut writer,
                 &RendererEvent::TerminalInput {
-                    data: format!("\x1b[200~{data}\x1b[201~"),
+                    data: terminal_agent_paste_bytes(&data),
                 },
             )?,
             Event::Mouse(mut event) if state.agent_focused => {
@@ -316,7 +335,8 @@ fn main() -> Result<()> {
                     send(&mut writer, &RendererEvent::TerminalInput { data })?;
                 }
             }
-            Event::Key(key) if key.kind == KeyEventKind::Press && state.agent_focused => {
+            Event::Key(key) if occupancy_agent_accepts_key(key) && state.agent_focused => {
+
                 match occupancy_key_binding(key, true, state.session_id.is_some()) {
                     OccupancyKeyBinding::ShowAgentsList => state.show_agents_list(),
                     OccupancyKeyBinding::ToggleFullscreen => state.toggle_focus_mode(),
@@ -690,8 +710,10 @@ fn main() -> Result<()> {
                 }
             }
             _ => {}
+            }
         }
     }
+
 
     let _ = send(&mut writer, &RendererEvent::Detach);
     terminal.show_cursor().ok();

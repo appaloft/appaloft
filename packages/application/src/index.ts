@@ -13,6 +13,8 @@ export * from "./agent-workspace-open-preflight";
 export * from "./agent-workspace-profile";
 export * from "./agent-workspace-profile-handlers";
 export * from "./agent-workspace-profile-messages";
+export * from "./occupancy-agent";
+
 export * from "./audit-event-handlers";
 export * from "./audit-event-messages";
 export * from "./auth-handlers";

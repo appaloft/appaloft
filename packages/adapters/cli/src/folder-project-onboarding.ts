@@ -118,31 +118,22 @@ export function isFolderOnboardingCancelled(error: unknown): boolean {
   return false;
 }
 
-const CTRL_C = "\u0003";
-
 export function quitCodeSessionOnCancel(): never {
   restoreWorkspaceTuiScrollback();
   process.exit(130);
 }
 
 function installImmediateCancel(): () => void {
-  let uninstall: () => void = () => undefined;
   const quit = () => {
-    uninstall();
+    removeProcessListener("SIGINT", quit);
     quitCodeSessionOnCancel();
   };
-  const onStdin = (chunk: string | Uint8Array) => {
-    const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("binary");
-    if (text.includes(CTRL_C)) quit();
-  };
   process.once("SIGINT", quit);
-  process.stdin.on("data", onStdin);
-  uninstall = () => {
+  return () => {
     removeProcessListener("SIGINT", quit);
-    process.stdin.off("data", onStdin);
   };
-  return () => uninstall();
 }
+
 
 export function withImmediateInquireCancel<A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -185,16 +176,22 @@ export function decideFolderProjectOnboarding(input: {
   }
 
   if (input.gitIdentity && input.binding?.status === "active") {
-    return {
-      kind: "reuse-binding",
-      projectId: input.binding.projectId,
-      identity: input.gitIdentity,
-    };
+    const bound = projects.find((project) => project.id === input.binding?.projectId);
+    if (bound) {
+      return {
+        kind: "reuse-binding",
+        projectId: bound.id,
+        identity: input.gitIdentity,
+      };
+    }
   }
 
   if (input.gitIdentity) {
     const named = findNamedProject(projects, createName);
     if (named) return { kind: "reuse-named", projectId: named.id, identity };
+    if (input.promptPolicy === "pre-tui-inquire" && input.canPrompt && !input.yes) {
+      return { kind: "inquire", name: createName, identity };
+    }
     return { kind: "create", name: createName, identity };
   }
 
@@ -437,7 +434,7 @@ export function ensureFolderProjectOnboarding(input: {
       writeStatus(`Creating project ${decision.name}…`, write);
       const createdProject = yield* createOnboardingProject(decision.name);
       projectId = createdProject.id;
-      projectName = decision.name;
+      projectName = createdProject.name;
       created = true;
     } else if (decision.kind === "prompt") {
       if (input.promptPolicy === "pre-tui-inquire" || input.promptPolicy === "auto-create") {
@@ -474,7 +471,7 @@ export function ensureFolderProjectOnboarding(input: {
       if (choice.startsWith("create:")) {
         const createdProject = yield* createOnboardingProject(decision.name);
         projectId = createdProject.id;
-        projectName = decision.name;
+        projectName = createdProject.name;
         created = true;
       } else {
         projectId = choice.slice("use:".length);
@@ -484,7 +481,7 @@ export function ensureFolderProjectOnboarding(input: {
       writeStatus(`Creating project ${decision.name}…`, write);
       const createdProject = yield* createOnboardingProject(decision.name);
       projectId = createdProject.id;
-      projectName = decision.name;
+      projectName = createdProject.name;
       created = true;
     } else {
       projectId = decision.projectId;
@@ -520,21 +517,53 @@ function createdProjectId(value: unknown): string | undefined {
   return typeof value.id === "string" && value.id.length > 0 ? value.id : undefined;
 }
 
+function isProjectSlugConflict(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as {
+    readonly code?: unknown;
+    readonly message?: unknown;
+    readonly details?: { readonly code?: unknown };
+  };
+  if (record.code === "project_slug_conflict" || record.details?.code === "project_slug_conflict") {
+    return true;
+  }
+  return (
+    typeof record.message === "string" && record.message.includes("Project slug already exists")
+  );
+}
+
+function uniqueOnboardingProjectName(base: string, attempt: number): string {
+  return `${base}-${attempt + 2}`;
+}
+
 function createOnboardingProject(name: string) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    const command = yield* resultToEffect(CreateProjectCommand.create({ name }));
-    const created = yield* Effect.promise(() => cli.executeCommand(command));
-    const project = yield* resultToEffect(created);
-    const id = createdProjectId(project);
-    if (!id) {
-      return yield* Effect.fail(
-        domainError.invariant("Create project did not return an id", {
-          phase: "folder-project-onboarding",
-        }),
-      );
+    let candidate = name;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const command = yield* resultToEffect(CreateProjectCommand.create({ name: candidate }));
+      const created = yield* Effect.promise(() => cli.executeCommand(command));
+      if (created.isOk()) {
+        const id = createdProjectId(created.value);
+        if (!id) {
+          return yield* Effect.fail(
+            domainError.invariant("Create project did not return an id", {
+              phase: "folder-project-onboarding",
+            }),
+          );
+        }
+        return { id, name: candidate };
+      }
+      if (!isProjectSlugConflict(created.error) || attempt === 4) {
+        return yield* Effect.fail(created.error);
+      }
+      candidate = uniqueOnboardingProjectName(name, attempt);
     }
-    return { id };
+    return yield* Effect.fail(
+      domainError.conflict("Project slug already exists", {
+        phase: "folder-project-onboarding",
+      }),
+    );
   });
 }
 

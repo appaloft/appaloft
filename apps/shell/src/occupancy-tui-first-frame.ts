@@ -7,9 +7,9 @@ export const OCCUPANCY_FIRST_FRAME_CHROME = "Appaloft Cloud Agents";
 export const OCCUPANCY_FIRST_FRAME_TITLE = "preparing the agent";
 export const OCCUPANCY_FIRST_FRAME_SPINNER = "⠋";
 export const OCCUPANCY_FIRST_FRAME_STEPS = [
-  "Checking login",
-  "Preparing skills",
-  "Preparing disk",
+  "Using your credential on the agent",
+  "Including your skills",
+  "Waking the agent",
 ] as const;
 
 let occupancyAltScreenEntered = false;

@@ -84,6 +84,7 @@ export interface WorkspaceActivationContextInitializerPort {
       readonly project: WorkspaceActivationContextDisposition;
       readonly repositoryBinding: WorkspaceActivationContextDisposition;
       readonly profile: WorkspaceActivationContextDisposition;
+      readonly projectId?: string;
       readonly createdProfileInstallationId?: string;
     }>
   >;
@@ -250,7 +251,13 @@ export class AgentWorkspaceOpenPreflightService {
         ),
       );
     }
-    const reread = await this.resolveCanonicalContext(context, input, initialized.value);
+    const reread = await this.resolveCanonicalContext(
+      context,
+      initialized.value.projectId
+        ? { ...input, projectId: initialized.value.projectId }
+        : input,
+      initialized.value,
+    );
     if (reread.isOk()) return reread;
     if (initialized.value.createdProfileInstallationId) {
       await disableCreatedProfileInstallation(
@@ -696,6 +703,7 @@ function missingActivationContext(
 ): "repository-binding" | "default-profile" | undefined {
   const code = error.details?.code;
   if (code === "workspace_open_repository_not_bound") return "repository-binding";
+  if (code === "workspace_open_project_unavailable") return "repository-binding";
   if (code === "workspace_open_profile_required") return "default-profile";
   if (
     requestedProfile &&

@@ -128,6 +128,8 @@ import { workspaceActivationTargetEvidenceMigration } from "./migrations/119_wor
 import { serverRuntimeTargetProfileMigration } from "./migrations/120_server_runtime_target_profile";
 import { sourceEventRequiredCheckDeliveriesMigration } from "./migrations/121_source_event_required_check_deliveries";
 import { repositoryBindingPerProjectMigration } from "./migrations/122_repository_binding_per_project";
+import { occupancyAgentsMigration } from "./migrations/123_occupancy_agents";
+
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -352,6 +354,8 @@ class StaticMigrationProvider implements MigrationProvider {
       "120_server_runtime_target_profile": serverRuntimeTargetProfileMigration,
       "121_source_event_required_check_deliveries": sourceEventRequiredCheckDeliveriesMigration,
       "122_repository_binding_per_project": repositoryBindingPerProjectMigration,
+      "123_occupancy_agents": occupancyAgentsMigration,
+
     };
   }
 }

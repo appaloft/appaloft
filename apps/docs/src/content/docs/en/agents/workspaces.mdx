@@ -60,22 +60,24 @@ Default `appaloft code` occupies **my Sandbox** on the team's default enrolled S
 Source is the remote SHA. Adapter and Profile are created if missing. The laptop path
 is not Workspace truth, and dirty files are not uploaded. A positional git remote
 (`https://`, `ssh://`, or `git@host:path`) occupies that repository without a local
-clone. On a TTY, default `code` opens the Cloud Agents TUI (alt screen)
-immediately with the workspace list **collapsed**, so the wait gets the whole
-window. The parent first frame is already the centered wait panel (**preparing
-the agent** plus Checking login / Preparing skills / Preparing disk), not an
-empty two-line splash. Occupy / copy skills / attach stay a left-aligned step
-list (Braille spinner, then ✓). Attach replaces that wait in the same fullscreen
-pane. Reopening the same folder resumes the last live disk instead of creating
-another one. `workspace` opens the same TUI as a navigator. They do not stream
-status lines as the primary UX.
+clone. On a TTY, default `code` first prints **Loading your project** on the
+normal screen, then opens the Cloud Agents TUI with the workspace list
+**collapsed**. The wait panel is **preparing the agent** with Using your
+credential / Including your skills / Waking the agent, including a generated
+`adjective-noun` agent name. It is not Checking login or Preparing disk.
+Occupy / copy skills / attach stay a left-aligned step list (Braille spinner,
+then ✓). Attach replaces that wait in the same fullscreen pane. Reopening the
+same folder resumes the last live disk instead of creating another one.
+`workspace` opens the same TUI as a navigator. They do not stream status lines
+as the primary UX.
 HOME skill copy is fail-soft and time-bounded; a timeout does not block occupy.
 `--server` pins the enrolled Server with the same meaning as `workspace open --server`.
 `--no-attach` and non-TTY scripts
 keep one-line stderr progress (including a first-byte status line before local
 database or composition boot) and print the Remote banner plus the connecting
-steps `using your {Grok|Codex|Claude} credential`, `including N skills`, and
-`work is on its disk`. `N` is the number of skills actually copied.
+steps `Using your {Grok|Codex|Claude} credential on the agent`,
+`Including N of your skills`, and `Woke agent {name}`. `N` is the number of
+skills actually copied.
 A source checkout (`appaloftdev`) finds or `cargo build`s the workspace TUI
 sidecar on first TTY run. Lookup includes the executed tree and common sibling
 checkouts (for example `appaloft-cloud/community/appaloft` → `appaloft`), plus

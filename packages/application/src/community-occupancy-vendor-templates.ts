@@ -4,6 +4,19 @@ import {
   COMMUNITY_OCCUPANCY_GROK_VERSION,
 } from "./community-occupancy-codex";
 import {
+  COMMUNITY_OCCUPANCY_OMP_IMAGE,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_NAME,
+  COMMUNITY_OCCUPANCY_OMP_VERSION,
+} from "./community-occupancy-omp";
+export {
+  COMMUNITY_OCCUPANCY_OMP_IMAGE,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_DIGEST,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_NAME,
+  COMMUNITY_OCCUPANCY_OMP_VERSION,
+} from "./community-occupancy-omp";
+import {
   COMMUNITY_OCCUPANCY_OPENCODE_ISOLATION,
   COMMUNITY_OCCUPANCY_OPENCODE_LIMITS,
 } from "./community-occupancy-opencode-template";
@@ -69,6 +82,14 @@ export function communityOccupancyGrokTemplateSpec() {
   });
 }
 
+export function communityOccupancyOmpTemplateSpec() {
+  return occupancyVendorTemplateSpec({
+    templateId: COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
+    name: COMMUNITY_OCCUPANCY_OMP_TEMPLATE_NAME,
+    image: COMMUNITY_OCCUPANCY_OMP_IMAGE,
+  });
+}
+
 export function communityOccupancyReservedTemplateSpec(templateId: string) {
   switch (templateId) {
     case COMMUNITY_OCCUPANCY_CLAUDE_TEMPLATE_ID:
@@ -77,6 +98,8 @@ export function communityOccupancyReservedTemplateSpec(templateId: string) {
       return communityOccupancyCodexTemplateSpec();
     case COMMUNITY_OCCUPANCY_GROK_TEMPLATE_ID:
       return communityOccupancyGrokTemplateSpec();
+    case COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID:
+      return communityOccupancyOmpTemplateSpec();
     default:
       return undefined;
   }
@@ -86,4 +109,5 @@ export const COMMUNITY_OCCUPANCY_VENDOR_TEMPLATE_VERSION = {
   claude: COMMUNITY_OCCUPANCY_CLAUDE_VERSION,
   codex: COMMUNITY_OCCUPANCY_CODEX_VERSION,
   grok: COMMUNITY_OCCUPANCY_GROK_VERSION,
+  omp: COMMUNITY_OCCUPANCY_OMP_VERSION,
 } as const;

@@ -7,6 +7,8 @@ import {
   COMMUNITY_OCCUPANCY_CODEX_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_GROK_IMAGE,
   COMMUNITY_OCCUPANCY_GROK_TEMPLATE_ID,
+  COMMUNITY_OCCUPANCY_OMP_IMAGE,
+  COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
   communityOccupancyReservedTemplateSpec,
 } from "../src/community-occupancy-vendor-templates";
 import {
@@ -82,7 +84,7 @@ test("[WS-REMOTE-VENDOR-204] Grok occupancy install helper pins the official CLI
   ]);
 });
 
-test("[WS-REMOTE-VENDOR-204] Claude Codex and Grok occupy reserved images with baked CLIs", () => {
+test("[WS-REMOTE-VENDOR-204] Claude Codex Grok and omp occupy reserved images with baked CLIs", () => {
   expect(
     communityOccupancyReservedTemplateSpec(COMMUNITY_OCCUPANCY_CLAUDE_TEMPLATE_ID),
   ).toMatchObject({
@@ -101,7 +103,14 @@ test("[WS-REMOTE-VENDOR-204] Claude Codex and Grok occupy reserved images with b
     templateId: COMMUNITY_OCCUPANCY_GROK_TEMPLATE_ID,
     image: COMMUNITY_OCCUPANCY_GROK_IMAGE,
   });
+  expect(
+    communityOccupancyReservedTemplateSpec(COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID),
+  ).toMatchObject({
+    templateId: COMMUNITY_OCCUPANCY_OMP_TEMPLATE_ID,
+    image: COMMUNITY_OCCUPANCY_OMP_IMAGE,
+  });
   expect(COMMUNITY_OCCUPANCY_CLAUDE_IMAGE).toContain(COMMUNITY_OCCUPANCY_CLAUDE_VERSION);
   expect(COMMUNITY_OCCUPANCY_CODEX_IMAGE).toContain(COMMUNITY_OCCUPANCY_CODEX_VERSION);
   expect(COMMUNITY_OCCUPANCY_GROK_IMAGE).toContain(COMMUNITY_OCCUPANCY_GROK_VERSION);
+  expect(COMMUNITY_OCCUPANCY_OMP_IMAGE).toContain("18.0.3");
 });

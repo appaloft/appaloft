@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type WriteSandboxFileCommand } from "@appaloft/application";
+import { ExecuteSandboxCommand, type WriteSandboxFileCommand } from "@appaloft/application";
 import { err, ok } from "@appaloft/core";
 
 import {
@@ -21,7 +21,7 @@ test("[WS-REMOTE-CRED-208] Grok auth.json is written to occupancy HOME", async (
   await mkdir(join(homeDir, ".grok"), { recursive: true });
   await writeFile(join(homeDir, ".grok", "auth.json"), '{"access_token":"grok-secret"}\n');
 
-  const commands: WriteSandboxFileCommand[] = [];
+  const commands: Array<WriteSandboxFileCommand | ExecuteSandboxCommand> = [];
   const offered = await offerOccupancyVendorCredential({
     workspaceId: "sbx_ready",
     vendor: "grok",
@@ -38,8 +38,8 @@ test("[WS-REMOTE-CRED-208] Grok auth.json is written to occupancy HOME", async (
     occupancyPath: ".grok/auth.json",
     kind: "auth.json",
   });
-  expect(commands).toHaveLength(1);
-  const written = commands[0];
+  expect(commands).toHaveLength(2);
+  const written = commands[0] as WriteSandboxFileCommand;
   expect(written?.input.path).toBe(".grok/auth.json");
   expect(written?.input.sandboxId).toBe("sbx_ready");
   expect(written).toBeDefined();
@@ -47,6 +47,12 @@ test("[WS-REMOTE-CRED-208] Grok auth.json is written to occupancy HOME", async (
   expect(Buffer.from(written.input.contentBase64, "base64").toString("utf8")).toContain(
     "grok-secret",
   );
+  expect(commands[1]).toBeInstanceOf(ExecuteSandboxCommand);
+  expect((commands[1] as ExecuteSandboxCommand).input.argv).toEqual([
+    "chmod",
+    "600",
+    "/workspace/.grok/auth.json",
+  ]);
 });
 
 test("[WS-REMOTE-CRED-209] Codex auth.json is written to occupancy HOME", async () => {

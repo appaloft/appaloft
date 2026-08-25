@@ -16,6 +16,8 @@ import {
   type SandboxAgentAttachDescriptor,
   type SandboxAgentRuntimeDescriptor,
 } from "./sandbox-agent-runtime";
+import { type OccupancyAgentRepository } from "./occupancy-agent";
+
 
 export interface WorkspaceOpenInput {
   readonly repository: string;
@@ -72,6 +74,8 @@ export interface WorkspaceOpenOptions {
   readonly placementProviderKey?: string;
   readonly targetServerId?: string;
   readonly expiresAt?: string;
+  readonly preferredAgentId?: string;
+
   readonly sourceMaterializer?: WorkspaceOpenSourceMaterializerPort;
   readonly skipSourceMaterialization?: boolean;
 }
@@ -271,6 +275,7 @@ export interface WorkspaceOpenKey {
 export interface WorkspaceOpenResult {
   readonly workspaceId: string;
   readonly name: string;
+  readonly agentId?: string;
   readonly resumed: boolean;
   readonly projectId: string;
   readonly source: {
@@ -287,6 +292,7 @@ export interface WorkspaceOpenResult {
   readonly targetSelection: WorkspaceTargetSelectionEvidence;
   readonly attach?: SandboxAgentAttachDescriptor;
 }
+
 
 export interface SandboxOpenDescriptor {
   readonly sandboxId: string;
@@ -323,6 +329,8 @@ export interface WorkspaceOpenDependencies {
     ): Promise<Result<WorkspaceOpenPreflight>>;
   };
   readonly entries: WorkspaceOpenEntryRepository;
+  readonly occupancyAgents?: OccupancyAgentRepository;
+
   readonly sourceCredentials?: WorkspaceOpenSourceCredentialProviderPort;
   readonly sandboxes: {
     create(
@@ -708,6 +716,8 @@ export class AgentWorkspaceOpenService {
         if (attached.isErr()) return err(attached.error);
         attach = attached.value;
       }
+      const occupancy = await this.occupyAgent(key, input, sandbox.value, options);
+      if (occupancy.isErr()) return err(occupancy.error);
       return ok(
         this.result(
           input,
@@ -719,8 +729,10 @@ export class AgentWorkspaceOpenService {
           preferred.activation ?? resolved.value.activation,
           preferred.targetSelection,
           attach,
+          occupancy.value,
         ),
       );
+
     }
 
     const sourceCredentialResult =
@@ -1055,6 +1067,10 @@ export class AgentWorkspaceOpenService {
         if (attached.isErr()) throw attached.error;
         attach = attached.value;
       }
+      const occupancy = await this.occupyAgent(key, input, sandbox, options);
+
+
+      if (occupancy.isErr()) throw occupancy.error;
       return ok(
         this.result(
           input,
@@ -1066,8 +1082,10 @@ export class AgentWorkspaceOpenService {
           preflight.activation,
           preflight.reservation.targetSelection,
           attach,
+          occupancy.value,
         ),
       );
+
     } catch (cause) {
       const failure = isDomainError(cause)
         ? cause
@@ -1091,6 +1109,30 @@ export class AgentWorkspaceOpenService {
     }
   }
 
+  private async occupyAgent(
+    key: WorkspaceOpenKey,
+    input: WorkspaceOpenInput,
+    sandbox: SandboxOpenDescriptor,
+    options: WorkspaceOpenOptions,
+  ) {
+    if (!this.dependencies.occupancyAgents) {
+      return ok({ name: sandbox.name });
+    }
+    return this.dependencies.occupancyAgents.occupy({
+      tenantId: key.tenantId,
+      subjectId: key.subjectId,
+      projectId: key.projectId,
+      repositoryIdentity: input.repositoryIdentity,
+      branch: input.branch,
+      sandboxId: sandbox.sandboxId,
+      name: sandbox.name,
+      forceNew: input.forceNew === true,
+      ...(options.preferredAgentId ? { preferredAgentId: options.preferredAgentId } : {}),
+      now: this.dependencies.now(),
+    });
+  }
+
+
   private result(
     input: WorkspaceOpenInput,
     projectId: string,
@@ -1100,11 +1142,13 @@ export class AgentWorkspaceOpenService {
     resumed: boolean,
     activation: WorkspaceActivationContextEvidence,
     targetSelection: WorkspaceTargetSelectionEvidence,
-    attach?: SandboxAgentAttachDescriptor,
+    attach: SandboxAgentAttachDescriptor | undefined,
+    occupancy: { readonly agentId?: string; readonly name: string },
   ): WorkspaceOpenResult {
     return {
       workspaceId: sandbox.sandboxId,
-      name: sandbox.name,
+      name: occupancy.name || sandbox.name,
+      ...(occupancy.agentId ? { agentId: occupancy.agentId } : {}),
       resumed,
       projectId,
       source: {
@@ -1115,11 +1159,12 @@ export class AgentWorkspaceOpenService {
         commitSha: input.commitSha,
       },
       profilePin,
-      sandbox,
+      sandbox: occupancy.name ? { ...sandbox, name: occupancy.name } : sandbox,
       agent,
       activation,
       targetSelection,
       ...(attach ? { attach } : {}),
     };
   }
+
 }

@@ -38,14 +38,14 @@ test("[WS-REMOTE-CONNECT-215] connecting-step data names credential, skill count
   expect(telemetry.skillCount).toBe(4);
   expect(telemetry.mcp).toEqual({ firstParty: true, remoteStdio: true });
   expect(telemetry.steps).toEqual([
-    { id: "credential", message: "using your Grok credential" },
-    { id: "skills", message: "including 4 skills" },
-    { id: "disk", message: "work is on its disk" },
+    { id: "credential", message: "Using your Grok credential on the agent" },
+    { id: "skills", message: "Including 4 of your skills" },
+    { id: "disk", message: "your work is on its disk" },
   ]);
   expect(occupancyConnectingStepLines(telemetry)).toEqual([
-    "using your Grok credential",
-    "including 4 skills",
-    "work is on its disk",
+    "Using your Grok credential on the agent",
+    "Including 4 of your skills",
+    "your work is on its disk",
   ]);
   expect(JSON.stringify(telemetry)).not.toMatch(/sk-|oauth|secret|token":/i);
 });
@@ -54,15 +54,15 @@ test("[WS-REMOTE-CONNECT-215] connecting steps exist for Claude and Codex labels
   expect(
     occupancyConnectingSteps({ vendor: "claude", credentialOffered: true, skillCount: 1 }),
   ).toEqual([
-    { id: "credential", message: "using your Claude credential" },
-    { id: "skills", message: "including 1 skills" },
-    { id: "disk", message: "work is on its disk" },
+    { id: "credential", message: "Using your Claude credential on the agent" },
+    { id: "skills", message: "Including 1 of your skill" },
+    { id: "disk", message: "your work is on its disk" },
   ]);
   expect(
     occupancyConnectingSteps({ vendor: "codex", credentialOffered: true, skillCount: 2 })[0],
   ).toEqual({
     id: "credential",
-    message: "using your Codex credential",
+    message: "Using your Codex credential on the agent",
   });
 });
 
@@ -132,7 +132,9 @@ test("[WS-REMOTE-AUTH-009] OpenCode occupy copies laptop /connect auth.json", as
     executeQuery: async () => err({ message: "missing" } as never),
   });
 
-  expect(telemetry.steps.map((step) => step.message)).toContain("using your OpenCode login");
+  expect(telemetry.steps.map((step) => step.message)).toContain(
+    "Using your OpenCode login on the agent",
+  );
   expect(commands.map((command) => command.input.path)).toEqual(
     expect.arrayContaining([".local/share/opencode/auth.json", OCCUPANCY_FIRST_PARTY_MCP_PATH]),
   );

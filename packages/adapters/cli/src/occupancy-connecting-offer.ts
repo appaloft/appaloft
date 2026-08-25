@@ -50,7 +50,8 @@ export async function offerOccupancyConnectingMaterials(input: {
     workspaceId: input.workspaceId,
     executeQuery: input.executeQuery,
   });
-  const writeOnly = (command: WriteSandboxFileCommand) => input.executeCommand(command);
+  const writeOnly = (command: WriteSandboxFileCommand | ExecuteSandboxCommand) =>
+    input.executeCommand(command);
   let credential: OccupancyConnectingTelemetry["credential"];
   let opencodeConnectOffered = false;
   if (input.vendor) {

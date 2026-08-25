@@ -6,6 +6,7 @@ import {
   EnvironmentName,
   err,
   ok,
+  type Project,
   ProjectByIdSpec,
   ProjectBySlugSpec,
   ProjectId,
@@ -31,7 +32,7 @@ import {
 import { selectWorkspaceProfileInstallation } from "./agent-workspace-profile-selector";
 import { COMMUNITY_OCCUPANCY_OPENCODE_PROFILE_ID } from "./community-occupancy-pi-template";
 import { type CommandBus } from "./cqrs";
-import { type ExecutionContext, toRepositoryContext } from "./execution-context";
+import { type ExecutionContext, type RepositoryContext, toRepositoryContext } from "./execution-context";
 import { CreateEnvironmentCommand } from "./operations/environments/create-environment.command";
 import { ConfigureProjectWorkspaceProfileCommand } from "./operations/projects/configure-project-workspace-profile.command";
 import { CreateProjectCommand } from "./operations/projects/create-project.command";
@@ -44,7 +45,7 @@ import {
   type SourceDetector,
 } from "./ports";
 import { type RepositoryBindingRepository } from "./repository-binding";
-import { BindProjectRepositoryCommand } from "./repository-binding-messages";
+import { BindProjectRepositoryCommand, UnbindRepositoryCommand } from "./repository-binding-messages";
 
 export interface CommunityRemoteWorkspaceDefaultProfileConfig {
   readonly adapterManifest: unknown;
@@ -55,6 +56,7 @@ type CommunityWorkspaceActivationInitializationResult = Result<{
   readonly project: WorkspaceActivationContextDisposition;
   readonly repositoryBinding: WorkspaceActivationContextDisposition;
   readonly profile: WorkspaceActivationContextDisposition;
+  readonly projectId: string;
   readonly createdProfileInstallationId?: string;
 }>;
 
@@ -131,46 +133,40 @@ export class CommunityWorkspaceActivationContextInitializer implements Workspace
         );
     let projectDisposition: WorkspaceActivationContextDisposition = "reused";
     let bindingDisposition: WorkspaceActivationContextDisposition = "reused";
-    let projectId: string;
 
-    if (input.projectId) {
+    const requestedProject = input.projectId
+      ? await this.findActiveProject(repositoryContext, input.projectId)
+      : null;
+    const boundProjectId =
+      binding?.binding.toState().status === "active"
+        ? binding.binding.toState().projectId.value
+        : undefined;
+    const boundProject =
+      !requestedProject && boundProjectId
+        ? await this.findActiveProject(repositoryContext, boundProjectId)
+        : null;
+    let projectId: string;
+    if (requestedProject && input.projectId) {
       projectId = input.projectId;
-    } else if (binding?.binding.toState().status === "active") {
-      projectId = binding.binding.toState().projectId.value;
+    } else if (boundProject && boundProjectId) {
+      projectId = boundProjectId;
     } else {
-      const name = projectNameForRepository(input.repositoryIdentity);
-      if (name.isErr()) return err(name.error);
-      const slug = ProjectSlug.fromName(name.value);
-      if (slug.isErr()) return err(slug.error);
-      let project = await this.dependencies.projects.findOne(
-        repositoryContext,
-        ProjectBySlugSpec.create(slug.value),
-      );
-      if (!project) {
-        const command = CreateProjectCommand.create({
-          name: name.value.value,
-          ...(context.tenant?.organizationId
-            ? { organizationId: context.tenant.organizationId }
-            : {}),
-        });
-        if (command.isErr()) return err(command.error);
-        const created = await this.dependencies.commandBus.execute(context, command.value);
-        if (created.isOk()) {
-          projectId = created.value.id;
-          projectDisposition = "created";
-        } else {
-          project = await this.dependencies.projects.findOne(
-            repositoryContext,
-            ProjectBySlugSpec.create(slug.value),
-          );
-          if (!project) return err(created.error);
-          projectId = project.id.value;
-        }
-      } else {
-        projectId = project.id.value;
-      }
+      const created = await this.createOrReuseNamedProject(context, input.repositoryIdentity);
+      if (created.isErr()) return err(created.error);
+      projectId = created.value.projectId;
+      projectDisposition = created.value.disposition;
     }
-    if (binding?.binding.toState().status !== "active") {
+
+    const bindingState = binding?.binding.toState();
+    if (bindingState?.status !== "active" || bindingState.projectId.value !== projectId) {
+      if (bindingState?.status === "active") {
+        const unbind = UnbindRepositoryCommand.create({
+          repositoryIdentity: input.repositoryIdentity,
+        });
+        if (unbind.isOk()) {
+          await this.dependencies.commandBus.execute(context, unbind.value);
+        }
+      }
       const bind = BindProjectRepositoryCommand.create({
         repositoryIdentity: input.repositoryIdentity,
         projectId,
@@ -202,11 +198,8 @@ export class CommunityWorkspaceActivationContextInitializer implements Workspace
       }
     }
 
-    const project = await this.dependencies.projects.findOne(
-      repositoryContext,
-      ProjectByIdSpec.create(ProjectId.rehydrate(projectId)),
-    );
-    if (project?.toState().lifecycleStatus.value !== "active") {
+    const project = await this.findActiveProject(repositoryContext, projectId);
+    if (!project) {
       return err(
         domainError.conflict("Workspace activation Project is unavailable", {
           code: "workspace_activation_context_conflict",
@@ -235,12 +228,10 @@ export class CommunityWorkspaceActivationContextInitializer implements Workspace
         project: projectDisposition,
         repositoryBinding: bindingDisposition,
         profile: "reused",
+        projectId,
       });
     }
 
-    // Reuse any enabled install for this profileId before digest lookup.
-    // findInstallationByDefinition is not the reuse gate: a digest bump must
-    // not call profiles.install() and create a second appaloft-remote.
     const requestedSelector = input.profile ?? COMMUNITY_OCCUPANCY_OPENCODE_PROFILE_ID;
     const existingBySelector = await this.findEnabledInstallationForSelector(
       context,
@@ -259,6 +250,7 @@ export class CommunityWorkspaceActivationContextInitializer implements Workspace
         project: projectDisposition,
         repositoryBinding: bindingDisposition,
         profile: "reused",
+        projectId,
       });
     }
 
@@ -266,7 +258,6 @@ export class CommunityWorkspaceActivationContextInitializer implements Workspace
       manifest: requestedProfile.profileManifest,
     });
     if (profileValidation.isErr()) return err(profileValidation.error);
-    // Digest match only classifies leftover disable vs created after install.
     const existingProfile = await this.dependencies.profileRepository.findInstallationByDefinition(
       repositoryContext,
       profileValidation.value.definitionDigest,
@@ -296,9 +287,64 @@ export class CommunityWorkspaceActivationContextInitializer implements Workspace
       project: projectDisposition,
       repositoryBinding: bindingDisposition,
       profile: existingProfile ? "reused" : "created",
+      projectId,
       ...(!existingProfile ? { createdProfileInstallationId: profile.value.installationId } : {}),
     });
   }
+
+  private async findActiveProject(
+    repositoryContext: RepositoryContext,
+    projectId: string,
+  ): Promise<Project | null> {
+    const project = await this.dependencies.projects.findOne(
+      repositoryContext,
+      ProjectByIdSpec.create(ProjectId.rehydrate(projectId)),
+    );
+    return project?.toState().lifecycleStatus.value === "active" ? project : null;
+  }
+
+  private async createOrReuseNamedProject(
+    context: ExecutionContext,
+    repositoryIdentity: string,
+  ): Promise<
+    Result<{
+      readonly projectId: string;
+      readonly disposition: WorkspaceActivationContextDisposition;
+    }>
+  > {
+    const repositoryContext = toRepositoryContext(context);
+    const name = projectNameForRepository(repositoryIdentity);
+    if (name.isErr()) return err(name.error);
+    const slug = ProjectSlug.fromName(name.value);
+    if (slug.isErr()) return err(slug.error);
+    const existing = await this.dependencies.projects.findOne(
+      repositoryContext,
+      ProjectBySlugSpec.create(slug.value),
+    );
+    if (existing?.toState().lifecycleStatus.value === "active") {
+      return ok({ projectId: existing.id.value, disposition: "reused" });
+    }
+    const command = CreateProjectCommand.create({
+      name: name.value.value,
+      ...(context.tenant?.organizationId
+        ? { organizationId: context.tenant.organizationId }
+        : {}),
+    });
+    if (command.isErr()) return err(command.error);
+    const created = await this.dependencies.commandBus.execute(context, command.value);
+    if (created.isOk()) {
+      return ok({ projectId: created.value.id, disposition: "created" });
+    }
+    const raced = await this.dependencies.projects.findOne(
+      repositoryContext,
+      ProjectBySlugSpec.create(slug.value),
+    );
+    if (raced?.toState().lifecycleStatus.value === "active") {
+      return ok({ projectId: raced.id.value, disposition: "reused" });
+    }
+    return err(created.error);
+  }
+
 
   private async findEnabledInstallationForSelector(
     context: ExecutionContext,

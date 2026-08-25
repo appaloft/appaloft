@@ -5,6 +5,8 @@ export * from "./dependency-resources";
 export * from "./execution-sandbox";
 export * from "./extensibility";
 export * from "./github-agent-automation";
+export * from "./occupancy-agent";
+
 export * from "./identity-governance";
 export * from "./release-orchestration";
 export * from "./repository-binding";

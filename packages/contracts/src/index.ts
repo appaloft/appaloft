@@ -247,6 +247,8 @@ export type WorkspaceAgentAttachResponse =
 
 export interface WorkspaceOpenResult {
   workspaceId: string;
+  name?: string;
+  agentId?: string;
   resumed: boolean;
   projectId: string;
   source: {
@@ -259,9 +261,11 @@ export interface WorkspaceOpenResult {
   profilePin: WorkspaceProfilePinResponse;
   sandbox: {
     sandboxId: string;
+    name?: string;
     status: string;
   };
   agent: WorkspaceAgentRuntimeResponse;
+
   activation: {
     project: {
       projectId: string;
