@@ -1,14 +1,20 @@
 import { WriteSandboxFileCommand } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
 
+import {
+  type OccupancyAppaloftLogin,
+  occupancyControlPlaneMcpUrl,
+  occupancyMcpAuthHeader,
+} from "./occupancy-login-offer.js";
+
 export const OCCUPANCY_FIRST_PARTY_MCP_PATH = ".mcp.json";
 export const OCCUPANCY_PROJECT_CONTEXT_PATH = ".appaloft/project.md";
 export const OCCUPANCY_PROJECT_AGENT_FILES = ["AGENTS.md", "GROK.md"] as const;
 
 /**
- * Secret-free first-party Appaloft MCP for the occupancy disk.
- * The occupancy image ships `appaloft`; login stays in `.appaloft/profiles.json`.
- * Laptop `mcp.json` secrets are never copied.
+ * First-party Appaloft MCP for occupancy. With a control-plane login, vendor
+ * MCP uses Streamable HTTP against `/mcp` so Grok/Codex/Claude do not need an
+ * `appaloft` binary on PATH. Without login, stdio stays secret-free.
  */
 export const OCCUPANCY_FIRST_PARTY_MCP_CONFIG = {
   mcpServers: {
@@ -26,14 +32,44 @@ export const OCCUPANCY_VENDOR_MCP_FILES = [
   { path: ".codex/config.toml", kind: "toml-mcp-servers" },
 ] as const;
 
-export function occupancyFirstPartyMcpBytes(): Uint8Array {
-  return occupancyMcpFileBytes("json-mcpServers");
+function tomlQuoted(value: string): string {
+  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
-export function occupancyMcpFileBytes(kind: "json-mcpServers" | "toml-mcp-servers"): Uint8Array {
+export function occupancyFirstPartyMcpBytes(login?: OccupancyAppaloftLogin): Uint8Array {
+  return occupancyMcpFileBytes("json-mcpServers", login);
+}
+
+export function occupancyMcpFileBytes(
+  kind: "json-mcpServers" | "toml-mcp-servers",
+  login?: OccupancyAppaloftLogin,
+): Uint8Array {
+  if (login) {
+    const url = occupancyControlPlaneMcpUrl(login.baseUrl);
+    const header = occupancyMcpAuthHeader(login.auth);
+    if (kind === "toml-mcp-servers") {
+      return new TextEncoder().encode(
+        `[mcp_servers.appaloft]\nurl = ${tomlQuoted(url)}\nheaders = { ${header.name} = ${tomlQuoted(header.value)} }\n`,
+      );
+    }
+    return new TextEncoder().encode(
+      `${JSON.stringify(
+        {
+          mcpServers: {
+            appaloft: {
+              url,
+              headers: { [header.name]: header.value },
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  }
   if (kind === "toml-mcp-servers") {
     return new TextEncoder().encode(
-      `[mcp_servers.appaloft]\ncommand = "appaloft"\nargs = ["mcp", "stdio"]\n`,
+      `[mcp_servers.appaloft]\ncommand = "/usr/local/bin/appaloft"\nargs = ["mcp", "stdio"]\n`,
     );
   }
   return new TextEncoder().encode(`${JSON.stringify(OCCUPANCY_FIRST_PARTY_MCP_CONFIG, null, 2)}\n`);
@@ -99,6 +135,7 @@ export async function offerOccupancyFirstPartyMcp(input: {
   readonly workspaceId: string;
   readonly executeCommand: (command: WriteSandboxFileCommand) => Promise<Result<unknown>>;
   readonly destinationExists?: (path: string) => Promise<boolean>;
+  readonly login?: OccupancyAppaloftLogin;
   readonly projectName?: string;
   readonly projectId?: string;
   readonly resources?: readonly {
@@ -112,7 +149,7 @@ export async function offerOccupancyFirstPartyMcp(input: {
     const wrote = await writeOccupancyFile({
       workspaceId: input.workspaceId,
       path: file.path,
-      bytes: occupancyMcpFileBytes(file.kind),
+      bytes: occupancyMcpFileBytes(file.kind, input.login),
       executeCommand: input.executeCommand,
     });
     if (wrote && file.path === OCCUPANCY_FIRST_PARTY_MCP_PATH) offered = true;
