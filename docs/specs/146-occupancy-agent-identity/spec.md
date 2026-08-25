@@ -2,7 +2,7 @@
 
 ## Status
 
-- Round: Code
+- Round: Code + Post-Implementation Sync
 
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: [ADR-125](../../decisions/ADR-125-occupancy-agent-and-project-binding.md),
