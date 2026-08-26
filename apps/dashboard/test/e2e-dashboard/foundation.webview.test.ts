@@ -1594,6 +1594,36 @@ describe("Dashboard foundation WebView", () => {
     expect(apiFixtureRequests).toHaveLength(settledRequestCount);
     expect(apiFixtureRequests.some((path) => path.includes("logsStream"))).toBe(false);
   }, 20_000);
+  test("[DASH-DATA-008] keeps the background Project overview idle across Resource destination switches", async () => {
+    await using view = createView(1_440, 1_000);
+    await navigateWithTheme(
+      view,
+      "/projects/atlas-api/resources/api-gateway/deployments?environment=production&view=list",
+      "light",
+    );
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(`Boolean(document.querySelector('[data-resource-deployments]'))`),
+      Boolean,
+    );
+    await waitFor(
+      () => view.evaluate<boolean>(`!document.querySelector('[aria-label="Loading project"]')`),
+      Boolean,
+    );
+
+    apiFixtureQueries.length = 0;
+    apiFixtureRequests.length = 0;
+    await clickResourceDestination(view, "/configuration", "[data-resource-configuration]");
+    await clickResourceDestination(view, "/deployments", "[data-resource-deployments]");
+    await waitFor(async () => apiFixtureQueries.includes("ListDeploymentsQuery"), Boolean);
+    expect(apiFixtureQueries).not.toContain("ProjectEnvironmentOverviewQuery");
+    expect(apiFixtureRequests).not.toContain("/api/rpc/projects/environmentOverview");
+    expect(
+      await view.evaluate<boolean>(
+        `Boolean(document.querySelector('[aria-label="Loading project"]'))`,
+      ),
+    ).toBe(false);
+  }, 15_000);
 
   test("[DASH-VIS-003][DASH-A11Y-007] captures labeled desktop Light and Dark fixtures", async () => {
     await using view = createView(1_440, 1_000);

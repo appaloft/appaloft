@@ -42,6 +42,7 @@ rules. Legacy route parity is deliberately absent.
 | DASH-DATA-005 | browser/network | Project list/overview renders                       | No per-Project or per-Resource request pattern appears.                                                                  |
 | DASH-DATA-006 | browser/network | Resource Overview is open                           | Only overview data loads; inactive logs/metrics/configuration/terminal destinations make zero requests/subscriptions.    |
 | DASH-DATA-007 | browser/network | Resource destination changes or closes              | Previous destination polling, stream, observer, and subscription owners are disposed.                                    |
+| DASH-DATA-008 | browser/network | Resource destination tabs switch with the panel open | The background Project overview issues no new requests and never re-enters loading.                                     |
 | DASH-OWN-008  | e2e             | Project Deployments opens                           | It is a bounded rollup and exposes Resource owner links; direct Project-owned deployment mutation is absent.             |
 | DASH-OWN-009  | e2e             | Resource deploy/configure/observe actions run       | They dispatch the accepted shared operations; no Svelte-local lifecycle rule exists.                                     |
 | DASH-OWN-010  | e2e             | contextual Agent utility opens                      | It prepares the active scope as a task brief and hands execution to Agent Workspace without owning another lifecycle.    |

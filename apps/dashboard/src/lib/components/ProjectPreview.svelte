@@ -38,6 +38,7 @@
   let error = $state(false);
   let createResourceOpen = $state(false);
   let latestRequest = 0;
+  let lastLoadKey = "";
 
   async function load(): Promise<void> {
     const request = ++latestRequest;
@@ -158,13 +159,17 @@
   });
 
   $effect(() => {
-    route.projectId;
-    route.environmentId;
-    route.cursor;
-    route.search;
-    route.sort;
-    route.filters;
-    activeDestination;
+    const loadKey = JSON.stringify([
+      route.projectId,
+      route.environmentId ?? "",
+      route.cursor ?? "",
+      route.search ?? "",
+      route.sort ?? "",
+      route.filters,
+      activeDestination,
+    ]);
+    if (loadKey === lastLoadKey) return;
+    lastLoadKey = loadKey;
     void load();
   });
 </script>
