@@ -1,0 +1,17 @@
+{
+  "name": "appaloft-plugin",
+  "owner": {
+    "name": "Appaloft",
+    "email": "admin@appaloft.com"
+  },
+  "metadata": {
+    "description": "Appaloft skill and hosted MCP. Deploy a folder to a live URL, or set up Agent so coding agents can write and operate Appaloft apps."
+  },
+  "plugins": [
+    {
+      "name": "appaloft",
+      "source": "plugins/appaloft",
+      "description": "Appaloft skill and hosted MCP. Deploy a folder to a live URL, or set up Agent so coding agents can write and operate Appaloft apps."
+    }
+  ]
+}

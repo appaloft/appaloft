@@ -1,0 +1,146 @@
+# MCP Tools
+
+Use this reference when an MCP host exposes Appaloft tools or when the user asks how to configure
+Appaloft MCP. The skill remains the procedural guide; MCP is the callable transport.
+
+## Setup
+
+Use the same Appaloft runtime as the CLI for stdio:
+
+```bash
+appaloft mcp stdio
+```
+
+This starts a stdio MCP server and composes the real Appaloft command/query buses. It does not
+deploy anything until the MCP client calls a tool.
+
+For local remote-HTTP clients:
+
+```bash
+appaloft mcp serve --host 127.0.0.1 --port 3939
+```
+
+This serves MCP JSON-RPC over HTTP at `/mcp`. Keep the default localhost bind unless a trusted
+reverse proxy or private network supplies the security boundary.
+
+For a dedicated package command:
+
+```bash
+npx @appaloft/mcp
+npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
+```
+
+The standalone `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the
+Appaloft CLI/runtime. It does not define another operation list or bypass the application buses.
+
+For Cursor or Claude Code connecting to a logged-in Appaloft Cloud or self-hosted control plane,
+run the one-command local Agent door. Do not put tokens into editor config:
+
+```bash
+appaloft login
+appaloft setup agent
+```
+
+That copies byte-identical skills into default-checked `~/.agents`, `~/.claude`, and `~/.cursor`
+hosts, then writes Local MCP into `~/.cursor/mcp.json` and `~/.claude.json`. OpenCode is listed but
+needs `--agent opencode`. Explicit siblings remain:
+
+```bash
+appaloft auth mcp cursor install
+appaloft auth mcp claude-code install
+appaloft auth mcp opencode install
+```
+
+Cursor and Claude Code merge `mcpServers.appaloft`. OpenCode install merges
+`~/.config/opencode/opencode.json` `mcp.appaloft` as `{ "type": "local", "command": [...],
+"enabled": true }`. All of those launch `appaloft mcp remote-stdio --profile <active-or-requested>`.
+
+For Codex connecting to hosted Appaloft Cloud, use the dedicated bearer handoff and local bridge:
+
+```bash
+appaloft auth mcp login
+appaloft auth mcp codex install
+```
+
+The Codex installer adds a token-free Codex MCP config entry that launches
+`appaloft mcp remote-stdio --profile mcp`. The bridge reads the local Appaloft MCP profile and
+forwards JSON-RPC to the hosted `/mcp` endpoint with bearer auth; Codex config does not store the
+bearer value.
+
+## Tool Naming
+
+Each MCP tool maps one-to-one to an operation catalog key:
+
+- `deployments.create` -> `deployments_create`
+- `deployments.plan` -> `deployments_plan`
+- `resources.configure-source` -> `resources_configure_source`
+- `resources.runtime-logs` -> `resources_runtime_logs` with either `resourceId` or
+  `previewEnvironmentId`
+- `dependency-resources.inspect` -> `dependency_resources_inspect`
+- `dependency-resources.query` -> `dependency_resources_query`
+- `runtime-monitoring.samples.list` -> `runtime_monitoring_samples_list`
+- `system.doctor` -> `system_doctor`
+- Occupancy first-party `appaloft-tools` is a subset of that catalog. After login + Server,
+  the bound tools are `projects_list`, `environments_list`, `environments_create`,
+  `environments_show`, `environments_set_variable`, `environments_unset_variable`,
+  `environments_effective_precedence`,
+  `resources_list`, `resources_show`, `resources_runtime_logs`, `resources_health`,
+  `resources_effective_config`, `resources_diagnostic_summary`, `resources_create`, `resources_configure_source`,
+  `resources_configure_runtime`, `resources_configure_network`, `resources_configure_access`,
+  `servers_list`, `deployments_list`, `deployments_plan`, `deployments_create`,
+  `deployments_show`, `deployments_proof`, `deployments_timeline`,
+  `preview_environments_list`, `preview_environments_show`,
+  `sandbox_ports_expose`, and `sandboxes_agent_tasks_deliver`. Tenant MCP Connections are
+  unchanged and may add more tools. A blocked `deployments_plan` is a next action, not a
+  hard stop: execute the named `nextActions` (`missing-internal-port` ->
+  `resources_configure_network` with source-evidenced `internalPort`, static-site `80`)
+  and replan before `deployments_create`.
+
+
+Do not look for agent-only tools such as `quick_deploy_create`. If a behavior is not in
+`packages/application/src/operation-catalog.ts`, it is not an Appaloft MCP operation.
+
+Tool responses include JSON text for older clients and structured content for hosts that support
+MCP structured results. Tool annotations mark read-only queries, destructive commands, idempotent
+queries, and the fact that deployment operations can touch external systems.
+
+## Resources
+
+The public server exposes read-only context resources:
+
+- `appaloft://operation-catalog`
+- `appaloft://tools/high-value`
+- `appaloft://skill/appaloft`
+- `appaloft://skill/deploy-protocol`
+- `appaloft://tools/mcp-guide`
+- `appaloft://docs/agent`
+
+Use them for tool discovery and workflow context. Do not treat resources as mutable state or policy.
+
+## Prompts
+
+The public server exposes prompts for common workflows:
+
+- `appaloft-first-deploy`
+- `appaloft-recover-deployment`
+- `appaloft-configure-resource`
+- `appaloft-observe-runtime`
+- `appaloft-publish-static-artifact`
+
+Prompts sequence existing tools only. They do not create new operations.
+
+## Safety
+
+- Preserve the same secret rules as CLI/API/Web: never read or print `.env`, private keys, tokens,
+  SSH material, cookies, raw connection strings, or unmasked logs.
+- Preview environments are selectors for existing service operations. Use `previewEnvironmentId`
+  on logs, health, diagnostics, effective config, runtime control, and terminal tools; do not infer
+  parent resource latest deployment as preview evidence.
+- Dependency safe query tools are allowlisted read-only inspection only. They must fail closed when
+  the provider adapter is unavailable or when the statement/command is outside the allowlist.
+- For destructive operations, inspect readback or delete-safety tools first and pass exact
+  confirmation fields when the operation schema requires them.
+- Keep auth, tenant context, operation guards, redaction, confirmations, and structured errors in
+  the Appaloft application/runtime boundary.
+- Prefer small explicit tool calls and return URL/access state first, then ids, status, logs,
+  diagnostics, recovery readiness, and the next safe action.

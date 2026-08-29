@@ -41,7 +41,7 @@
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.json --noEmit --checkers 4",
     "test": "turbo run test",
-    "test:unit": "turbo run test:unit && bun test scripts/test/appaloft-skill-evals.test.ts",
+    "test:unit": "turbo run test:unit && bun test scripts/test/appaloft-skill-evals.test.ts scripts/test/appaloft-marketplace-plugin.test.ts",
     "test:integration": "turbo run test:integration",
     "test:e2e": "turbo run test:e2e",
     "format": "oxfmt .",

@@ -1,0 +1,19 @@
+{
+  "name": "appaloft",
+  "displayName": "Appaloft",
+  "description": "Appaloft skill and hosted MCP. Deploy a folder to a live URL, or set up Agent so Cursor can write and operate Appaloft apps.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Appaloft",
+    "email": "admin@appaloft.com"
+  },
+  "publisher": "Appaloft",
+  "homepage": "https://docs.appaloft.com/en/agents/skill",
+  "repository": "https://github.com/appaloft/appaloft",
+  "license": "Apache-2.0",
+  "keywords": ["appaloft", "deploy", "agent", "mcp", "agent-skills"],
+  "category": "Deployment",
+  "tags": ["mcp", "skills", "appaloft"],
+  "skills": "./skills/",
+  "mcpServers": "./.cursor-plugin/mcp.json"
+}
