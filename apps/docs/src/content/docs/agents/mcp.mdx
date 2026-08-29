@@ -11,6 +11,9 @@ searchAliases:
   - "appaloft mcp"
   - "AI tools"
   - "工具协议"
+  - "hosted mcp"
+  - "grok bot"
+  - "https://app.appaloft.com/mcp"
 relatedOperations:
   - "deployments.create"
   - "deployments.plan"
@@ -49,6 +52,8 @@ appaloft setup agent
 ```
 
 `appaloft setup agent` 默认勾选 Universal、存在 `~/.claude` 时的 Claude Code、存在 `~/.cursor` 时的 Cursor；把相同 Skill 复制到对应目录，再写入 token-free `mcp remote-stdio` 到 `~/.claude.json` 和 `~/.cursor/mcp.json`。Universal 只写 Skill。OpenCode 在列表里但默认不勾选，需要 `--agent opencode`。显式 sibling：`appaloft auth mcp cursor install`、`appaloft auth mcp claude-code install`、`appaloft auth mcp opencode install`。`npx skills add` 仍然只复制 Skill。Codex 仍需要专用 bearer profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以用 `appaloft up`。
+
+在 Grok Bot 里不要走这条本机命令。请安装 [Grok Bot 插件](/docs/agents/grok-bot-plugin/)，它打包同一份 `skills/appaloft` 和托管 HTTP MCP [`https://app.appaloft.com/mcp`](https://app.appaloft.com/mcp)，用 OAuth 鉴权，插件 JSON 不放 token。插件不会取代 `appaloft setup agent` 或 `appaloft mcp stdio`。
 
 ## 输入字段与校验：工具模型
 
@@ -113,5 +118,6 @@ appaloft mcp stdio
 ## 相关任务
 
 - [完整 Appaloft Skill](/docs/agents/skill/)
+- [Grok Bot 插件](/docs/agents/grok-bot-plugin/)
 - [Agent 部署子协议](/docs/agents/deploy-skill/)
 - [选择入口](/docs/start/entrypoints/)

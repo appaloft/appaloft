@@ -35,6 +35,8 @@ appaloft setup agent
 
 `appaloft setup agent` default-checks universal, Claude Code when `~/.claude` exists, and Cursor when `~/.cursor` exists. It copies byte-identical skills and writes token-free `mcp remote-stdio` launchers into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills only. OpenCode is listed but not default-checked; pass `--agent opencode`. Explicit siblings remain: `appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and `appaloft auth mcp opencode install`. `npx skills add` still only copies the skill. Codex still needs the dedicated bearer profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft up`.
 
+Do not use those laptop commands inside Grok Bot. Install the [Grok Bot plugin](/docs/en/agents/grok-bot-plugin/), which packages the same `skills/appaloft` skill with the hosted HTTP MCP at [`https://app.appaloft.com/mcp`](https://app.appaloft.com/mcp). Authentication is OAuth on that hosted MCP; the plugin JSON does not contain a token. The plugin does not replace `appaloft setup agent` or `appaloft mcp stdio`.
+
 ## Input fields and validation: the tool model
 
 Every tool corresponds to a business operation key, with `.` replaced by `_` in the naming:
@@ -98,5 +100,6 @@ appaloft mcp stdio
 ## Related tasks
 
 - [Full Appaloft Skill](/docs/en/agents/skill/)
+- [Grok Bot plugin](/docs/en/agents/grok-bot-plugin/)
 - [Agent Deploy Subprotocol](/docs/en/agents/deploy-skill/)
 - [Choosing an Entrypoint](/docs/en/start/entrypoints/)

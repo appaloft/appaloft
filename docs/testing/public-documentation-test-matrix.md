@@ -95,7 +95,10 @@ Current status:
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
   a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and
-  explicit anchor in docs source.
+  explicit anchor in docs source. The Grok Bot plugin topic resolves to
+  `/docs/agents/grok-bot-plugin/#grok-bot-plugin` (en-US:
+  `/docs/en/agents/grok-bot-plugin/#grok-bot-plugin`) and is linked from the Agent overview and MCP
+  pages. Do not introduce `/ai/grok-bot-plugin` or `/agent/grok-bot-plugin`.
 - `PUB-DOCS-006` is covered at build level by Fumadocs static Orama search index generation.
 - `PUB-DOCS-007` is covered at content-schema level by required `localeState` frontmatter for each
   docs page.
