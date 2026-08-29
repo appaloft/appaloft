@@ -1,0 +1,97 @@
+---
+title: "Grok Bot 插件"
+description: "在 Grok Bot 中安装 Appaloft 插件，通过托管 MCP 用对话完成部署、查看日志和创建例程。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "grok bot"
+  - "grok bot plugin"
+  - "hosted mcp"
+  - "appaloft grok"
+  - "https://app.appaloft.com/mcp"
+  - "Grok Bot 插件"
+  - "托管 MCP"
+relatedOperations:
+  - "deployments.create"
+sidebar:
+  order: 11
+---
+
+## 目标 <a id="grok-bot-plugin" />
+
+Appaloft 的 Grok Bot 插件把现有的 `skills/appaloft` 与托管 HTTP MCP 打成一份安装包。装好并完成 OAuth 后，机器人可以在对话里使用 Appaloft 的两扇产品门：**Deploy**（把文件夹变成 URL）和 **Agent**（`setup` + `code`）。
+
+这条路径**不会**取代笔记本上的 `appaloft setup agent` 或 `appaloft mcp stdio`。本机宿主仍然走那条安装。
+
+```mermaid
+flowchart LR
+    DIR["Grok Bot 插件目录"] --> SEARCH["搜索 appaloft"]
+    SEARCH --> ADD["Add"]
+    ADD --> AUTH["托管 MCP OAuth"]
+    AUTH --> USE["对话里部署 / 日志 / 例程"]
+```
+
+## 何时使用
+
+当你要在 Grok Bot 里直接操作 Appaloft 时，用本页。笔记本上的 Cursor、Claude Code 或其他本机宿主，继续看 [MCP 与工具协议](/docs/agents/mcp/)。
+
+## 安装插件 <a id="grok-bot-plugin-install" />
+
+在 Grok Bot 的插件目录里安装 Appaloft：
+
+1. 打开 Grok Bot。
+2. 打开插件目录。
+3. 搜索 `appaloft`。
+4. 在结果里点 **Add**。
+
+插件 JSON **不包含** token。鉴权在下一步通过托管 MCP 的 OAuth 完成。
+
+## 完成鉴权 <a id="grok-bot-plugin-authenticate" />
+
+添加插件后，用托管 MCP 的 OAuth 连接你的 Appaloft 账号：
+
+1. 打开 Grok Bot 里的 Appaloft 插件页。
+2. 选择 **Authenticate**。
+3. 在浏览器里完成托管 MCP 的 OAuth。
+
+托管 MCP 地址是 [`https://app.appaloft.com/mcp`](https://app.appaloft.com/mcp)。
+
+## 在 Grok Bot 里使用 Appaloft <a id="grok-bot-plugin-use-cases" />
+
+向机器人说出你要的结果。常见用法：
+
+- **部署**：把一个文件夹变成可访问的 URL（Deploy 门）。
+- **日志**：查询应用收集的日志。
+- **例程**：在 Grok 里创建例程，例如按日汇总应用使用情况。
+
+## 包含什么 <a id="grok-bot-plugin-included" />
+
+插件会装上这两部分：
+
+- 现有的 `skills/appaloft`，说明如何用同一套业务操作完成 setup、部署和运维。
+- 托管 HTTP MCP：[`https://app.appaloft.com/mcp`](https://app.appaloft.com/mcp)，通过 OAuth 访问你的 Appaloft 账号。插件 JSON 不放 token。
+
+## 本机路径仍然有效 <a id="grok-bot-plugin-laptop-path" />
+
+在笔记本上给本机宿主写入 Skill 和 Local MCP，继续用：
+
+```bash
+appaloft login
+appaloft setup agent
+```
+
+或直接启动本机 MCP：
+
+```bash
+appaloft mcp stdio
+```
+
+详见 [MCP 与工具协议](/docs/agents/mcp/)。Grok Bot 插件是托管 MCP 入口，不是 `appaloft setup agent` 的替代品。
+
+## 相关任务
+
+- [MCP 与工具协议](/docs/agents/mcp/)
+- [完整 Appaloft Skill](/docs/agents/skill/)
+- [选择入口](/docs/start/entrypoints/)

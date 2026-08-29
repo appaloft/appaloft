@@ -1402,6 +1402,42 @@ export const publicDocsHelpTopics = {
       "skills/appaloft/references/mcp-tools.md",
     ],
   },
+  "agent.grok-bot-plugin": {
+    id: "agent.grok-bot-plugin",
+    title: "Grok Bot plugin",
+    description:
+      "How to install the Appaloft Grok Bot plugin, authenticate with hosted MCP OAuth, and keep laptop setup agent as a separate path.",
+    page: {
+      "zh-CN": "agents/grok-bot-plugin",
+      "en-US": "en/agents/grok-bot-plugin",
+    },
+    anchor: "grok-bot-plugin",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["mcp"],
+    aliases: [
+      "grok bot",
+      "grok bot plugin",
+      "hosted MCP",
+      "https://app.appaloft.com/mcp",
+      "appaloft grok",
+      "Grok Bot 插件",
+      "托管 MCP",
+    ],
+    specReferences: [
+      "docs/agent/appaloft-mcp-server.md",
+      "docs/decisions/ADR-080-appaloft-as-mcp-transport-boundary.md",
+      "docs/specs/090-appaloft-as-mcp-transport/spec.md",
+      "skills/appaloft/SKILL.md",
+      "skills/appaloft/references/mcp-tools.md",
+    ],
+    webSurfaces: [
+      'Marketing site localizedDocsUrl("/agents/grok-bot-plugin")',
+      "apps/docs Agent index, MCP page, and sitemap entry at /agents/grok-bot-plugin",
+    ],
+  },
   "source.auto-deploy-setup": {
     id: "source.auto-deploy-setup",
     title: "Source auto-deploy setup",

@@ -426,6 +426,71 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[PUB-DOCS-005] Grok Bot plugin resolves to Agent-door docs at /agents/grok-bot-plugin", () => {
+    const topic = publicDocsHelpTopics["agent.grok-bot-plugin"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/agents/grok-bot-plugin/#grok-bot-plugin",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agents/grok-bot-plugin/#grok-bot-plugin",
+    );
+    expect(topic.page["zh-CN"]).toBe("agents/grok-bot-plugin");
+    expect(topic.page["en-US"]).toBe("en/agents/grok-bot-plugin");
+    expect(topic.localeCoverage).toEqual({
+      "zh-CN": "complete",
+      "en-US": "complete",
+    });
+    expect(topic.surfaces).toEqual(["mcp"]);
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining(["grok bot plugin", "https://app.appaloft.com/mcp", "hosted MCP"]),
+    );
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/agent/appaloft-mcp-server.md",
+        "docs/decisions/ADR-080-appaloft-as-mcp-transport-boundary.md",
+        "skills/appaloft/SKILL.md",
+      ]),
+    );
+
+    const zhPage = readFileSync(docsSourcePath(topic.page["zh-CN"]), "utf8");
+    const enPage = readFileSync(docsSourcePath(topic.page["en-US"]), "utf8");
+    const overviewZh = readFileSync(docsSourcePath("agents/overview"), "utf8");
+    const overviewEn = readFileSync(docsSourcePath("en/agents/overview"), "utf8");
+    const mcpZh = readFileSync(docsSourcePath("agents/mcp"), "utf8");
+    const mcpEn = readFileSync(docsSourcePath("en/agents/mcp"), "utf8");
+
+    for (const source of [zhPage, enPage]) {
+      expect(pageHasAnchor(source, "grok-bot-plugin")).toBe(true);
+      expect(pageHasAnchor(source, "grok-bot-plugin-install")).toBe(true);
+      expect(pageHasAnchor(source, "grok-bot-plugin-authenticate")).toBe(true);
+      expect(pageHasAnchor(source, "grok-bot-plugin-included")).toBe(true);
+      expect(pageHasAnchor(source, "grok-bot-plugin-use-cases")).toBe(true);
+      expect(pageHasAnchor(source, "grok-bot-plugin-laptop-path")).toBe(true);
+      expect(source).toContain("https://app.appaloft.com/mcp");
+      expect(source).toContain("skills/appaloft");
+      expect(source).toContain("appaloft setup agent");
+      expect(source).toContain("appaloft mcp stdio");
+      expect(source).not.toMatch(/\/ai\/grok-bot-plugin|\/agent\/grok-bot-plugin/);
+      expect(source.toLowerCase()).not.toContain("occupancy");
+    }
+
+    expect(zhPage).toContain("插件 JSON **不包含** token");
+    expect(enPage).toContain("does **not** contain a token");
+    expect(zhPage).toContain("不是 `appaloft setup agent` 的替代品");
+    expect(enPage).toContain("does not replace `appaloft setup agent`");
+    expect(overviewZh).toContain("/docs/agents/grok-bot-plugin/");
+    expect(overviewEn).toContain("/docs/en/agents/grok-bot-plugin/");
+    expect(mcpZh).toContain("/docs/agents/grok-bot-plugin/");
+    expect(mcpEn).toContain("/docs/en/agents/grok-bot-plugin/");
+    expect(readFileSync(docsSourcePath("index"), "utf8")).toContain(
+      "/docs/agents/grok-bot-plugin/",
+    );
+    expect(readFileSync(docsSourcePath("en/index"), "utf8")).toContain(
+      "/docs/en/agents/grok-bot-plugin/",
+    );
+  });
+
   test("[APPALOFT-MCP-018] MCP host install resolves to Cursor and OpenCode install anchors", () => {
     const cliTopic = publicDocsHelpTopics["cli.mcp-host-install"];
     const mcpTopic = publicDocsHelpTopics["agent.appaloft-mcp-host-install"];

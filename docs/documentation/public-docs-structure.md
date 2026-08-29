@@ -76,7 +76,7 @@ The canonical IA v3 groups are:
 | 4 | 配置与环境 · Configuration | Environments, variables, secrets, precedence, snapshots, diff/promote, config file reference. | Explain deploy-time configuration and safe secret handling. | Operators and developers |
 | 5 | 域名与访问 · Access | Generated access URLs, default access policy, custom domains, ownership, certificates, DNS troubleshooting. | Explain how deployed resources become reachable. | Operators |
 | 6 | 排障 · Troubleshoot | Status, logs, health summaries, diagnostics, common failures, safe support payloads. | Explain what happened and how to recover safely. | Operators and support |
-| 7 | Agent 与 Sandbox · Agents | Full Appaloft skill, agent deploy subprotocol, Agent Workspace lifecycle, Sandbox model, Workspace Collaboration, terminal/TUI attach, and future tool/skill protocols. | Explain how AI agents and agent-hosting Workspaces use existing Appaloft entrypoints safely. | Agent authors, automation users, and Agent Workspace operators |
+| 7 | Agent 与 Sandbox · Agents | Full Appaloft skill, agent deploy subprotocol, Agent Workspace lifecycle, Sandbox model, Workspace Collaboration, terminal/TUI attach, Grok Bot plugin at `/agents/grok-bot-plugin`, and future tool/skill protocols. | Explain how AI agents and agent-hosting Workspaces use existing Appaloft entrypoints safely. | Agent authors, automation users, and Agent Workspace operators |
 | 8 | 参考 · Reference | CLI, HTTP API, Web console, errors, statuses, configuration reference. | Provide exact commands, routes, fields, and status contracts. | Automation authors and integrators |
 | 9 | 自托管 · Self-Hosting | Binary bundle, Docker image, static asset overrides, database status/migration, backup/restore, upgrade. | Explain operating Appaloft itself. | Self-hosters and platform operators |
 | 10 | 平台迁移 · Migrate | Import from Railway and other platforms, review digest-bound plans, apply/resume, verify, and exactly clean receipt-owned state. | Explain how to leave another platform without inventing a second Appaloft lifecycle or bypassing existing safety guards. | Operators migrating existing applications |
@@ -90,9 +90,11 @@ specific nested page available, not the group overview.
 Group 7 (Agent 与 Sandbox) must document Agent Workspace and Sandbox as first-class task/concept
 pages, not as an implicit consequence of the Appaloft skill page. At minimum it must cover: what an
 Agent Workspace is and how it relates to a Sandbox; how to create, connect to, and clean up a
-Workspace; how Workspace Collaboration and hibernation/recovery behave; and how agent adapters are
-installed and selected. This closes the IA v2 gap where `agent/workspaces.md` and
-`agent/sandboxes.md` existed as content but were absent from the governing group description.
+Workspace; how Workspace Collaboration and hibernation/recovery behave; how agent adapters are
+installed and selected; and the Grok Bot plugin install path at `/agents/grok-bot-plugin` (both
+locales; never `/ai/grok-bot-plugin` or `/agent/grok-bot-plugin`). This closes the IA v2 gap where
+`agent/workspaces.md` and `agent/sandboxes.md` existed as content but were absent from the governing
+group description.
 
 Legacy top-level seed pages and IA v2 group/page paths are not retained after IA v3 cutover. New
 public docs work must add pages under the IA v3 groups instead of adding top-level topic pages or
@@ -375,11 +377,12 @@ current worktree.
 IA v2 pages exist in `zh-CN` and `en-US` under nested grouped paths such as `deploy/sources`,
 `deploy/lifecycle`, `resources/profiles/*`, `servers/credentials/*`,
 `environments/variables/*`, `access/domains/*`, `observe/*`, `integrations/*`,
-`agent/*` (including `agent/workspaces.md` and `agent/sandboxes.md`, which are real content not yet
-reflected in this file's group description prior to the IA v3 rewrite above), `reference/*`, and
+`agents/*` (including `agents/workspaces.mdx`, `agents/sandboxes.mdx`, and
+`agents/grok-bot-plugin.mdx` at the locked public path `/agents/grok-bot-plugin`), `reference/*`, and
 `self-hosting/*`. They declare locale state in frontmatter and include stable explicit anchors for
 first-pass help-link targets. Legacy top-level seed pages are intentionally removed, and product help
-surfaces now target specific nested pages instead of group overviews.
+surfaces now target specific nested pages instead of group overviews. Do not add
+`/ai/grok-bot-plugin` or `/agent/grok-bot-plugin`.
 
 `@appaloft/design` now owns product-facing design tokens and the design-language contract. Web
 imports `@appaloft/design/styles/web.css` and remains the reference implementation. Docs imports
