@@ -1,0 +1,580 @@
+# CLI Entrypoints
+
+This reference mirrors every Appaloft CLI transport in `packages/application/src/operation-catalog.ts`.
+Use it to map AI intent to the same operations exposed through CLI, HTTP/API, Web, and MCP
+surfaces. If a command is absent here, treat it as unsupported until the operation catalog adds it.
+
+## Deploy Mode Notes
+
+- `appaloft login` and `appaloft auth login` are local profile/context commands, not operation
+  catalog entries. Without `--url`, they default to the public Appaloft Cloud control plane at
+  `https://app.appaloft.com`, print the Cloud browser login URL and user code, wait for explicit
+  Enter before opening the browser when enabled, then write a local `cloud` profile only after a
+  trusted local credential verifies against the current organization context. First Cloud
+  `appaloft up` folds that same login into the deployment command for a human TTY. `appaloft deploy`
+  remains the supported 1.x compatibility spelling. Coding-agent, CI, and non-TTY `up` / `deploy` /
+  `setup agent` print a plan and do not mutate without `--yes`. This
+  is a human interactive login path, not the default AI-agent auth handoff.
+- `appaloft auth mcp login` writes a dedicated bearer `mcp` profile through the same browser
+  handoff. Use it when a host needs a bearer MCP profile. Cursor, Claude Code, and OpenCode host
+  install should reuse an already-logged-in `appaloft login` product-session or bearer profile
+  instead.
+- `appaloft auth mcp cursor install` merges a token-free `~/.cursor/mcp.json`
+  `mcpServers.appaloft` stdio entry that launches `appaloft mcp remote-stdio --profile <active>`.
+  `appaloft auth mcp claude-code install` merges the same launcher into `~/.claude.json`.
+  `appaloft auth mcp opencode install` merges a token-free `~/.config/opencode/opencode.json`
+  `mcp.appaloft` local entry (`type: "local"`, `command: [...]`, `enabled: true`) for the same
+  launcher. `appaloft auth mcp codex install` still requires the bearer `mcp` profile and writes
+  `~/.codex/config.toml`. None of these host files store tokens.
+- `appaloft setup agent` is the one-command local Agent door over that family. It default-checks
+  universal/Claude/Cursor, lists OpenCode without installing it unless `--agent opencode`, and
+  skips matching already-installed skill/MCP entries.
+- `appaloft mcp stdio` and `npx @appaloft/mcp` remain the local stdio transport when a host is
+  configured by hand instead of through `auth mcp <host> install`.
+- `appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]`
+  imports a scoped bearer token from CLI-approved input or `APPALOFT_TOKEN`, verifies the selected
+  endpoint and current organization context, then writes a redacted local profile. Do not pass raw
+  token material as an argv value.
+- `appaloft auth status`, `appaloft context show`, `appaloft context list`,
+  `appaloft context use <profile>`, and `appaloft logout` only manage local CLI profile/context
+  state. They must not create projects, resources, deployments, source links, or domain bindings.
+- `appaloft up` is the canonical interactive CLI entrypoint. `appaloft deploy` remains its 1.x
+  compatibility spelling and is also the CLI spelling used by Pure SSH Action. SSH targets default
+  to server-owned `ssh-pglite` state when no control plane is selected.
+- Server-owned SSH PGlite maintenance is explicit and coordinated: create an immutable backup with
+  `appaloft remote-state backup create`, restore it only to a distinct
+  `<runtime-parent>/recovery/<candidate>` root with `remote-state backup restore-copy`, run
+  `appaloft db migrate --remote-runtime-root <candidate>` and read-only validation there, then use
+  `remote-state backup promote-copy` with the validated plan digest. Use
+  `remote-state backup rollback` with the immutable reference if later smoke fails. Never edit the
+  live PGlite directory or database files directly.
+- Self-hosted Server Action does not call the CLI for deployment. It calls self-hosted Action API
+  endpoints with `control-plane-url` and `appaloft-token`; server-config deploy then resolves
+  source-link context and dispatches ids-only `deployments.create`.
+- Product-grade preview operations are the `preview-policies.*` and `preview-environments.*`
+  catalog entries. They are control-plane-owned and are not the same as Action-only PR preview
+  workflow files.
+- A preview environment can be used as a selector for existing service operations. Prefer
+  `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
+  control, and terminal commands when the user is operating a preview rather than its parent
+  resource.
+- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--server <id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder on a TTY inquires before the session TUI (`Continue` → create a default Project named after the directory → link this folder); `--yes` / non-interactive create-or-links without asking. `^c` quits that inquire immediately. `code` never overlays a project picker on the Cloud Agents alt-screen. `--pi` only selects the Pi harness and does not change chrome. Git remote is correspondence when present and is not required. It requires a default
+  enrolled Server, dispatches `workspaces.open` with the remote SHA and
+  `targetServerId`. `--server` pins that Server with the same semantics as
+  `workspace open --server`.   On a TTY, after that inquire, it prints
+  `Loading your project` on the normal screen, then enters the Cloud Agents
+  session page with the tree hidden and a centered **preparing the agent**
+  wait (Using your credential / Including your skills / Waking the agent),
+  then attaches into the remote session. Origin HTTP 502/503 or a Cloudflare
+  bad-gateway / incomplete origin response during **Waking the agent** keeps
+  that wait panel up, marks the disk step retrying, and retries
+  `workspaces.open` on the enrolled Server until a live session attaches or
+  the occupy deadline expires. Attach waits for disk prep. An in-flight hang
+  is abortable. Exhausted / deadline / cancelled failure marks the disk step
+  failed, restores the TTY once, prints a human Cloud-unreachable / disk-prep
+  next step (not `Opening folder.local` and not the Appaloft error-contract
+  dump), and exits non-zero. Ctrl-C on the wait panel before attach is not
+  success. A matching Cloud Agents `appaloft-workspace-tui`
+  is required. Lookup includes the executed tree and sibling/dev checkouts
+  (`appaloft-cloud/community/appaloft` → `appaloft`) plus
+  `APPALOFT_WORKSPACE_TUI_BINARY`.   A missing or stale renderer is not launched; `code` restores the TTY and
+  prints one human message that names `cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`. Homebrew rustc/cargo is enough; rustup is not required.
+  `--no-attach` and non-TTY print
+  one-line progress and
+  `Remote · agent <name> · <repo@sha> · <server> · <project>`.
+  `<name>` is the persisted Agent handle (an Appaloft-generated kebab such as
+  `resonant-silence`, or a folder directory name). `repo@short-sha` is the git
+  pin, not the handle. Never print `sbx_*` on
+  that banner, TUI list, or TUI detail. JSON / `--json` may still include
+  `workspaceId`.
+  `--no-attach` also prints the connecting steps `Using your {Grok|Codex|Claude} credential on the agent`,
+  `Including N of your skills`, and `Woke agent {name}` (`N` is actually copied).
+  Skill copy is fail-soft and time-bounded; a timeout does not block occupy.
+  Default harness is OpenCode. Default `code` and `code --new` pick the live occupancy / live
+  install. Same-name leftover Profiles must not block first success and must not require
+  memorizing installation ids. `--profile` is a fallback pin; only an explicit colliding name
+  with more than one live occupancy lists both ids and `appaloft code --profile <id>`.
+  `--new` occupies the cwd origin and does not silently resume whoami. A non-git directory
+  occupies this folder via a git remote and does not resume an unrelated occupancy. If the preferred
+  Workspace is partial, default `code` preserves it and automatically creates an isolated replacement;
+  lower-level `workspace open` still fail-closes with its recovery evidence. A failed open names
+  the repository and the missing Binding or Profile, and keeps `causeCode` visible; it does
+  not invent a successful occupancy.   `--opencode`, `--pi`, `--omp`, `--claude`, `--codex`, and `--grok` are mutually exclusive. `--claude` / `--codex` / `--grok` launch that vendor CLI on the remote Sandbox and still copy the laptop credential. `--harness` is compatibility only.
+  Default alias follows the saved occupancy-agent preference, then laptop sign-in or install.
+  `--pi` (or compatibility `--harness pi`) occupies reserved
+  `appaloft-remote-pi` and does not rewrite the project's OpenCode default; an existing
+  OpenCode Workspace needs `--new`. A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
+  without a local clone. Laptop Git is not uploaded. Occupy writes the public Appaloft
+  skill, a secret-free first-party Appaloft MCP file, and may write my laptop vendor
+  credential onto occupancy HOME (`~/.grok/auth.json`, `~/.codex/auth.json`, or a Claude
+  setup-token — not the Claude chat cookie). For `--codex`, this copies this Mac's
+  `~/.codex/auth.json` to `.codex/auth.json` under the selected remote Workspace HOME; Appaloft
+  never prints it or places it in MCP/env. Remove the remote copy with
+  `appaloft sandbox file remove <sandboxId> --path .codex/auth.json`. Removing that file does not revoke
+  upstream access, so also revoke the corresponding Codex/OpenAI session in the upstream account
+  security console. Occupy may add-only copy allowlisted HOME skill directories
+  (`~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, `~/.agents/skills`, plus
+  `~/.cursor/skills` and `~/.config/opencode/skills` beyond Railway) into
+  `/workspace/skills/<name>` and `/workspace/.agents/skills/<name>`. Only directories
+  with `SKILL.md` are copied; skill-tree `mcp.json`, tokens, cookies, `.env`, and plugin binaries
+  are not. Missing login or Server fails
+  closed and never becomes Scratch. `owner/repo` is a local path, not GitHub shorthand.
+- After occupy, omit project/environment/resource ids on `env list|show|set|unset|effective-precedence`,
+  `project show`, `resource list|show|logs|health|diagnose|effective-config|terminal|runtime restart`,
+  and `deploy`. Those reuse this folder's linked Project when present, otherwise the matching
+  occupancy Project, Environment `local`, and Resource `app`. `appaloft project use <projectId>`
+  switches the folder link. Explicit ids still win. Missing occupancy stays fail-closed.
+- `appaloft code --local [path]` is a local Scratch session on this Mac. It does not
+  require Git, login, Binding, Profile or Cloud, creates no Sandbox, and prints
+  `Local scratch · this Mac · not saved remotely`. `--local` plus a git remote fails
+  closed. The only other hard failure before attach is a missing OpenCode/Pi binary
+  after the user refuses install. Do not treat scratch as a durable Workspace.
+- `appaloft workspace open [path|git-remote] [--server <id>]` is the durable Profile-aware entrypoint.
+  It accepts the same locators as `code`: a local path (Git optional) or a git remote. A clean
+  pushed worktree still fail-closes when dirty; a non-git directory occupies from a git remote
+  and does not resume an unrelated occupancy. When a BYOS Server is registered, open/create pass that Server as
+  `targetServerId` (`--server` pins it) and do not demand managed capacity. No enrolled Server
+  stays omitted.
+  `workspace create/list/show/pause/resume/terminate/connect/attach/task/preview` remain
+  lower-level workflows over Sandbox, Agent Runtime, Terminal Session, and Sandbox Port
+  operations. `workspaceId` is the underlying `sandboxId`; do not invent a Workspace
+  aggregate or Cloud-only operation.
+
+## Catalog
+
+- `appaloft migrate plan --input <bundle.json>` - `migrations.plan`
+- `appaloft migrate apply (--plan <plan.json> | --task <task.json>) --confirm <digest>` - `migrations.apply`
+- `appaloft migrate status --task <task.json>` - `migrations.status`
+- `appaloft migrate verify --task <task.json>` - `migrations.verify`
+- `appaloft migrate cleanup --task <task.json> --confirm <digest>` - `migrations.cleanup`
+- `appaloft agent-adapter validate <manifest>` - `agent-adapters.validate`
+- `appaloft agent-adapter install <manifest>` - `agent-adapters.install`
+- `appaloft agent-adapter list` - `agent-adapters.list`
+- `appaloft agent-adapter show <installationId>` - `agent-adapters.show`
+- `appaloft agent-adapter disable <installationId>` - `agent-adapters.disable`
+- `appaloft agent-adapter uninstall <installationId>` - `agent-adapters.uninstall`
+- `appaloft agent-workspace-profile validate <manifest>` - `agent-workspace-profiles.validate`
+- `appaloft agent-workspace-profile install <manifest>` - `agent-workspace-profiles.install`
+- `appaloft agent-workspace-profile list` - `agent-workspace-profiles.list`
+- `appaloft agent-workspace-profile show <installationId>` - `agent-workspace-profiles.show`
+- `appaloft agent-workspace-profile compile <installationId>` - `agent-workspace-profiles.compile`
+- `appaloft agent-workspace-profile credential-connection set <installationId>` - `agent-workspace-profiles.configure-credential-connections`
+- `appaloft agent-workspace-profile mcp-connection set <installationId>` - `agent-workspace-profiles.configure-mcp-connections`
+- `appaloft agent-workspace-profile disable <installationId>` - `agent-workspace-profiles.disable`
+- `appaloft agent-workspace-profile uninstall <installationId>` - `agent-workspace-profiles.uninstall`
+- `appaloft project configure-workspace-profile <projectId>` - `projects.configure-workspace-profile`
+- `appaloft repository-binding bind` - `repository-bindings.bind`
+- `appaloft repository-binding show` - `repository-bindings.show`
+- `appaloft repository-binding unbind` - `repository-bindings.unbind`
+- `appaloft code` - occupy my Sandbox via `workspaces.open`; `--local` is Scratch
+- `appaloft workspace open [path|git-remote] [--server <id>]` - `workspaces.open` from a path or git remote; enrolled BYOS is placement
+- `appaloft sandbox create` - `sandboxes.create`
+- `appaloft sandbox list` - `sandboxes.list`
+- `appaloft sandbox show <sandboxId>` - `sandboxes.show`
+- `appaloft sandbox events <sandboxId> --follow` - `sandboxes.events.stream`
+- `appaloft sandbox pause <sandboxId>` - `sandboxes.pause`
+- `appaloft sandbox resume <sandboxId>` - `sandboxes.resume`
+- `appaloft sandbox terminate <sandboxId>` - `sandboxes.terminate`
+- `appaloft sandbox exec <sandboxId> -- <argv...>` - `sandboxes.exec`
+- `appaloft sandbox file list <sandboxId> --path <path>` - `sandbox-files.list`
+- `appaloft sandbox file read <sandboxId> --path <path>` - `sandbox-files.read`
+- `appaloft sandbox file write <sandboxId> --path <path>` - `sandbox-files.write`
+- `appaloft sandbox file remove <sandboxId> --path <path>` - `sandbox-files.remove`
+- `appaloft sandbox process list <sandboxId>` - `sandbox-processes.list`
+- `appaloft sandbox process terminate <sandboxId> <processId>` - `sandbox-processes.terminate`
+- `appaloft sandbox process show <sandboxId> <processId>` - `sandbox-processes.show`
+- `appaloft sandbox network deny <sandboxId>` - `sandboxes.network-policy.configure`
+- `appaloft sandbox port expose <sandboxId> <port>` - `sandbox-ports.expose`
+- `appaloft sandbox port list <sandboxId>` - `sandbox-ports.list`
+- `appaloft sandbox port revoke <sandboxId> <exposureId>` - `sandbox-ports.revoke`
+- `appaloft sandbox snapshot create <sandboxId>` - `sandbox-snapshots.create`
+- `appaloft sandbox snapshot list` - `sandbox-snapshots.list`
+- `appaloft sandbox snapshot show <snapshotId>` - `sandbox-snapshots.show`
+- `appaloft sandbox snapshot delete <snapshotId>` - `sandbox-snapshots.delete`
+- `appaloft sandbox template create` - `sandbox-templates.create`
+- `appaloft sandbox template list` - `sandbox-templates.list`
+- `appaloft sandbox template show <templateId>` - `sandbox-templates.show`
+- `appaloft sandbox template delete <templateId>` - `sandbox-templates.delete`
+- `appaloft workspace harness list` - `sandboxes.agents.harnesses.list`
+- `appaloft workspace attach <workspaceId>` - `sandboxes.agents.runtimes.attach`
+- `appaloft workspace task run <workspaceId>` - `sandboxes.agent-tasks.create`
+- `appaloft workspace task list <workspaceId>` - `sandboxes.agent-tasks.list`
+- `appaloft workspace task show <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.show`
+- `appaloft workspace task resume <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.resume`
+- `appaloft workspace task stop <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.stop`
+- `appaloft workspace task steer <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.steer`
+- `appaloft workspace task cancel <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.cancel`
+- `appaloft workspace task approve <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.approve`
+- `appaloft workspace task deliver <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.deliver`
+- `appaloft github-agent repository bind` - `github-agent.repository-bindings.create`
+- `appaloft github-agent repository list` - `github-agent.repository-bindings.list`
+- `appaloft github-agent rule create` - `github-agent.automation-rules.create`
+- `appaloft github-agent rule list` - `github-agent.automation-rules.list`
+- `appaloft github-agent rule disable <ruleId>` - `github-agent.automation-rules.disable`
+- `appaloft github-agent profile create` - `github-agent.agent-profiles.create`
+- `appaloft github-agent profile list` - `github-agent.agent-profiles.list`
+- `appaloft github-agent profile disable <profileId>` - `github-agent.agent-profiles.disable`
+- `appaloft sandbox agent runtime create <sandboxId>` - `sandboxes.agents.runtimes.create`
+- `appaloft sandbox agent runtime list <sandboxId>` - `sandboxes.agents.runtimes.list`
+- `appaloft sandbox agent runtime show <sandboxId> <runtimeId>` - `sandboxes.agents.runtimes.show`
+- `appaloft sandbox agent runtime terminate <sandboxId> <runtimeId>` - `sandboxes.agents.runtimes.terminate`
+- `appaloft sandbox agent run create <sandboxId> <runtimeId>` - `sandboxes.agents.runs.create`
+- `appaloft sandbox agent run list <runtimeId>` - `sandboxes.agents.runs.list`
+- `appaloft sandbox agent run show <runtimeId> <runId>` - `sandboxes.agents.runs.show`
+- `appaloft sandbox agent run cancel <runtimeId> <runId>` - `sandboxes.agents.runs.cancel`
+- `appaloft sandbox agent run events <runId>` - `sandboxes.agents.runs.events`
+- `appaloft sandbox agent run events <runId> --follow` - `sandboxes.agents.runs.events.stream`
+- `appaloft sandbox agent approval list <runId>` - `sandboxes.agents.approvals.list`
+- `appaloft sandbox agent approval show <approvalId>` - `sandboxes.agents.approvals.show`
+- `appaloft sandbox agent approval resolve <approvalId>` - `sandboxes.agents.approvals.resolve`
+- `appaloft sandbox artifact create <sandboxId>` - `sandboxes.source-artifacts.create`
+- `appaloft sandbox artifact list <sandboxId>` - `sandboxes.source-artifacts.list`
+- `appaloft sandbox artifact show <artifactId>` - `sandboxes.source-artifacts.show`
+- `appaloft sandbox artifact delete <artifactId>` - `sandboxes.source-artifacts.delete`
+- `appaloft sandbox preview create <artifactId>` - `sandboxes.candidate-previews.create`
+- `appaloft sandbox preview show <previewId>` - `sandboxes.candidate-previews.show`
+- `appaloft sandbox preview delete <previewId>` - `sandboxes.candidate-previews.delete`
+- `appaloft sandbox promote plan <sandboxId>` - `sandboxes.promotions.plan`
+- `appaloft sandbox promote list <sandboxId>` - `sandboxes.promotions.list`
+- `appaloft sandbox promote show <promotionId>` - `sandboxes.promotions.show`
+- `appaloft sandbox promote accept <promotionId>` - `sandboxes.promotions.accept`
+- `appaloft sandbox promote retry <promotionId>` - `sandboxes.promotions.retry`
+
+- `appaloft auth bootstrap-status` - `auth.bootstrap-status`
+- `appaloft auth bootstrap-first-admin` - `auth.bootstrap-first-admin`
+- `appaloft organization context` - `organizations.current-context`
+- `appaloft organization switch <organizationId>` - `organizations.switch-current`
+- `appaloft organization members list` - `organizations.list-members`
+- `appaloft organization invitations list` - `organizations.list-invitations`
+- `appaloft organization member invite` - `organizations.invite-member`
+- `appaloft organization member role <memberId>` - `organizations.change-member-role`
+- `appaloft organization member remove <memberId>` - `organizations.remove-member`
+- `appaloft organization member restore <memberId>` - `organizations.reactivate-member`
+- `appaloft organization owner transfer <fromMemberId> <toMemberId>` - `organizations.transfer-owner`
+- `appaloft deploy-token create` - `deploy-tokens.create`
+- `appaloft deploy-token list` - `deploy-tokens.list`
+- `appaloft deploy-token show <tokenId>` - `deploy-tokens.show`
+- `appaloft deploy-token rotate <tokenId> --confirm <tokenId>` - `deploy-tokens.rotate`
+- `appaloft deploy-token revoke <tokenId> --confirm <tokenId>` - `deploy-tokens.revoke`
+- `appaloft preview policy configure` - `preview-policies.configure`
+- `appaloft preview policy show` - `preview-policies.show`
+- `appaloft preview environment list` - `preview-environments.list`
+- `appaloft preview environment show` - `preview-environments.show`
+- `appaloft preview environment delete` - `preview-environments.delete`
+- `appaloft blueprint list` - `blueprints.list`
+- `appaloft blueprint show` - `blueprints.show`
+- `appaloft blueprint plan-install` - `blueprints.plan-install`
+- `appaloft blueprint install` - `blueprints.install`
+- `appaloft blueprint installation show` - `blueprints.installation.show`
+- `appaloft project create` - `projects.create`
+- `appaloft project list` - `projects.list`
+- `appaloft project count` - `projects.count`
+- `appaloft project show <projectId>` - `projects.show`
+- `appaloft project use <projectId>` - CLI-local folder link; no catalog operation. Persists this cwd to the shown Project for later `deploy`/`code`
+- `appaloft project rename <projectId> --name <name>` - `projects.rename`
+- `appaloft project reorder --project-ids <ids>` - `projects.reorder`
+- `appaloft project set-description <projectId> --description <description>` - `projects.set-description`
+- `appaloft project archive <projectId>` - `projects.archive`
+- `appaloft project restore <projectId>` - `projects.restore`
+- `appaloft project delete-check <projectId>` - `projects.delete-check`
+- `appaloft project delete <projectId> --confirm <projectId>` - `projects.delete`
+- `appaloft blueprint list` - `blueprints.list`
+- `appaloft blueprint show` - `blueprints.show`
+- `appaloft blueprint plan-install` - `blueprints.plan-install`
+- `appaloft blueprint install` - `blueprints.install`
+- `appaloft blueprint installation show` - `blueprints.installation.show`
+- `appaloft server register` - `servers.register`
+- `appaloft server configure-workload-roles <serverId> --workload-role <role>` - `servers.configure-workload-roles`
+- `appaloft server configure-runtime-target-profile <serverId> --connection-reference <ref> [--routing-policy-reference <ref>]` - `servers.configure-runtime-target-profile`; for public k3s Traefik use `builtin://kubernetes/ingress-controller/traefik-k3s`, which permits only the exact `kube-system` + `app.kubernetes.io/name=traefik` ingress source
+- `appaloft server credential <serverId>` - `servers.configure-credential`
+- `appaloft server credential-create` - `credentials.create-ssh`
+- `appaloft server credential-list` - `credentials.list-ssh`
+- `appaloft server credential-show <credentialId>` - `credentials.show`
+- `appaloft server credential-delete <credentialId> --confirm <credentialId>` - `credentials.delete-ssh`
+- `appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>` - `credentials.rotate-ssh`
+- `appaloft server list` - `servers.list`
+- `appaloft server count` - `servers.count`
+- `appaloft server show <serverId>` - `servers.show`
+- `appaloft server readiness <serverId>` - `servers.runtime-readiness`
+- `appaloft server capacity inspect <serverId> [--state-backend ssh-pglite --server-host <host> --server-ssh-username <user> --server-ssh-private-key-file <path> --remote-runtime-root <path>] [--retry-pending-state-sync]` - `servers.capacity.inspect`; explicit SSH-PGlite selects local shell execution even with an active remote Profile, rejects active mutation locks without writing one, downloads authoritative state read-only, and does not upload it. Use the retry flag only to finish a preserved revision-fenced audit upload before this read-only inspection
+- `appaloft runtime-usage inspect <scope>` - `runtime-usage.inspect`
+- `appaloft runtime-monitoring samples <scope> --from <iso> --to <iso>` - `runtime-monitoring.samples.list`
+- `appaloft runtime-monitoring rollup <scope> --from <iso> --to <iso> --bucket <bucket>` - `runtime-monitoring.rollup`
+- `appaloft runtime-monitoring thresholds configure <scope> --rule <json>` - `runtime-monitoring.thresholds.configure`
+- `appaloft runtime-monitoring thresholds show <scope>` - `runtime-monitoring.thresholds.show`
+- `appaloft server capacity prune <serverId> --before <iso> [--target <id-or-target>] [--state-backend ssh-pglite --server-host <host> --server-ssh-username <user> --server-ssh-private-key-file <path> --remote-runtime-root <path>]` - `servers.capacity.prune`; keep the default strict read-only dry-run first, then pass `--dry-run false` explicitly. Successful destructive runs synchronize command/audit state; if that final upload fails, recover through `server capacity inspect ... --retry-pending-state-sync` so deletion is not replayed
+- `appaloft server capacity policy configure --scope <scope> --retention-days <days>` - `scheduled-runtime-prune-policies.configure`
+- `appaloft server capacity policy list` - `scheduled-runtime-prune-policies.list`
+- `appaloft server capacity policy show <policyId>` - `scheduled-runtime-prune-policies.show`
+- `appaloft server rename <serverId> --name <name>` - `servers.rename`
+- `appaloft server reorder --server-ids <ids>` - `servers.reorder`
+- `appaloft server proxy configure <serverId> --kind none|traefik|caddy` - `servers.configure-edge-proxy`
+- `appaloft server deactivate <serverId>` - `servers.deactivate`
+- `appaloft server delete-check <serverId>` - `servers.delete-check`
+- `appaloft server delete <serverId> --confirm <serverId>` - `servers.delete`
+- `appaloft server test <serverId>; appaloft server doctor <serverId>` - `servers.test-connectivity`
+- `appaloft server proxy repair <serverId>` - `servers.bootstrap-proxy`
+- `appaloft server runtime prepare <serverId>` - `servers.prepare-runtime`
+- `appaloft resource list` - `resources.list`
+- `appaloft resource count` - `resources.count`
+- `appaloft resource show <resourceId>` - `resources.show`
+- `appaloft resource create` - `resources.create`
+- `appaloft resource archive <resourceId>` - `resources.archive`
+- `appaloft resource restore <resourceId>` - `resources.restore`
+- `appaloft resource delete-check <resourceId>` - `resources.delete-check`
+- `appaloft resource delete <resourceId> --confirm-slug <slug>` - `resources.delete`
+- `appaloft resource configure-health <resourceId>` - `resources.configure-health`
+- `appaloft resource reset-health <resourceId>` - `resources.reset-health`
+- `appaloft resource configure-source <resourceId>` - `resources.configure-source`
+- `appaloft resource configure-runtime <resourceId>` - `resources.configure-runtime`
+- `appaloft resource configure-network <resourceId>` - `resources.configure-network`
+- `appaloft resource configure-scale <resourceId>` - `resources.configure-scale`
+- `appaloft resource configure-rollout <resourceId>` - `resources.configure-rollout`
+- `appaloft resource configure-access <resourceId>` - `resources.configure-access`
+- `appaloft resource auto-deploy <resourceId>` - `resources.configure-auto-deploy`
+- `appaloft resource storage attach <resourceId>` - `resources.attach-storage`
+- `appaloft resource storage detach <resourceId> <attachmentId>` - `resources.detach-storage`
+- `appaloft resource set-variable <resourceId> <key> <value>` - `resources.set-variable`
+- `appaloft resource secrets create <resourceId> <key> [<value> | --stdin]` - `resources.secrets.create`
+- `appaloft resource secrets rotate <resourceId> <key> [<value> | --stdin]` - `resources.secrets.rotate`
+- `appaloft github status` - `system.github-app-connection.show`
+- `appaloft github repositories [--search <text>]` - `system.github-repositories.list`
+- `appaloft resource secrets delete <resourceId> <key>` - `resources.secrets.delete`
+- `appaloft resource secrets list <resourceId>` - `resources.secrets.list`
+- `appaloft resource secrets show <resourceId> <key>` - `resources.secrets.show`
+- `appaloft resource import-variables <resourceId> --content <dotenv>` - `resources.import-variables`
+- `appaloft resource unset-variable <resourceId> <key>` - `resources.unset-variable`
+- `appaloft resource effective-config [resourceId] [--preview <previewEnvironmentId>]` - `resources.effective-config`
+- `appaloft resource logs [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime-logs`
+- `appaloft resource log-archives archive <resourceId>` - `resources.runtime-logs.archive`
+- `appaloft resource log-archives list` - `resources.runtime-log-archives.list`
+- `appaloft resource log-archives show <archiveId>` - `resources.runtime-log-archives.show`
+- `appaloft resource log-archives prune --before <iso>` - `resources.runtime-log-archives.prune`
+- `appaloft resource runtime-control-attempts prune --before <iso>` - `resources.runtime-control-attempts.prune`
+- `appaloft server terminal <serverId>; appaloft resource terminal [resourceId] [--preview <previewEnvironmentId>]; appaloft sandbox terminal <sandboxId>` - `terminal-sessions.open`
+- `appaloft terminal-session list` - `terminal-sessions.list`
+- `appaloft terminal-session show <sessionId>` - `terminal-sessions.show`
+- `appaloft terminal-session close <sessionId>` - `terminal-sessions.close`
+- `appaloft terminal-session expire` - `terminal-sessions.expire`
+- `appaloft workspace collaboration create` - `workspace-collaborations.create`
+- `appaloft workspace collaboration list` - `workspace-collaborations.list`
+- `appaloft workspace collaboration show <collaborationId>` - `workspace-collaborations.show`
+- `appaloft workspace collaboration participant add <collaborationId>` - `workspace-collaborations.participants.add`
+- `appaloft workspace collaboration participant role <collaborationId> <participantId>` - `workspace-collaborations.participants.change-role`
+- `appaloft workspace collaboration participant remove <collaborationId> <participantId>` - `workspace-collaborations.participants.remove`
+- `appaloft workspace collaboration lane add <collaborationId>` - `workspace-collaborations.lanes.add`
+- `appaloft workspace collaboration lane archive <collaborationId> <laneId>` - `workspace-collaborations.lanes.archive`
+- `appaloft workspace collaboration writer acquire <collaborationId> <laneId>` - `workspace-collaborations.writer-leases.acquire`
+- `appaloft workspace collaboration writer renew <collaborationId> <laneId>` - `workspace-collaborations.writer-leases.renew`
+- `appaloft workspace collaboration writer release <collaborationId> <laneId>` - `workspace-collaborations.writer-leases.release`
+- `appaloft workspace collaboration writer transfer <collaborationId> <laneId>` - `workspace-collaborations.writer-leases.transfer`
+- `appaloft workspace collaboration handoff offer <collaborationId>` - `workspace-collaborations.handoffs.offer`
+- `appaloft workspace collaboration handoff resolve <collaborationId> <handoffId>` - `workspace-collaborations.handoffs.resolve`
+- `appaloft workspace collaboration access <collaborationId> <laneId>` - `workspace-collaborations.lanes.authorize-access`
+- `appaloft workspace collaboration terminal <collaborationId> <laneId>` - `workspace-collaborations.lanes.terminal-access.issue`
+- `appaloft workspace collaboration attach <collaborationId> <laneId>` - `workspace-collaborations.lanes.native-attach.issue`
+- `appaloft workspace collaboration close <collaborationId>` - `workspace-collaborations.close`
+- `appaloft resource diagnose [resourceId] [--preview <previewEnvironmentId>]` - `resources.diagnostic-summary`
+- `appaloft resource access-failure <requestId>` - `resources.access-failure-evidence.lookup`
+- `appaloft resource health [resourceId] [--preview <previewEnvironmentId>]` - `resources.health`
+- `appaloft resource health-history <resourceId> --from <iso> --to <iso>` - `resources.health-history`
+- `appaloft resource proxy-config <resourceId>` - `resources.proxy-configuration.preview`
+- `appaloft dependency provision --kind <kind>` - `dependency-resources.provision`
+- `appaloft dependency import --kind <kind>` - `dependency-resources.import`
+- `appaloft dependency rotate-connection <dependencyResourceId> --connection-url-stdin` - `dependency-resources.rotate-connection`
+- `appaloft dependency plan --mode <create|reuse>` - `dependency-resources.provisioning.plan`
+- `appaloft dependency accept <planId> --acknowledge-mutation` - `dependency-resources.provisioning.accept`
+- `appaloft dependency status <planId>` - `dependency-resources.provisioning.status`
+- `appaloft dependency list` - `dependency-resources.list`
+- `appaloft dependency count` - `dependency-resources.count`
+- `appaloft dependency show <dependencyResourceId>` - `dependency-resources.show`
+- `appaloft dependency inspect <dependencyResourceId>` - `dependency-resources.inspect`
+- `appaloft dependency query <dependencyResourceId> --statement <statement>` - `dependency-resources.query`
+- `appaloft dependency rename <dependencyResourceId>` - `dependency-resources.rename`
+- `appaloft dependency delete <dependencyResourceId>` - `dependency-resources.delete`
+- `appaloft dependency backup create <dependencyResourceId>` - `dependency-resources.create-backup`
+- `appaloft dependency backup list <dependencyResourceId>` - `dependency-resources.list-backups`
+- `appaloft dependency backup show <backupId>` - `dependency-resources.show-backup`
+- `appaloft dependency backup restore <backupId>` - `dependency-resources.restore-backup`
+- `appaloft dependency backup policy configure <dependencyResourceId>` - `dependency-resources.backup-policies.configure`
+- `appaloft dependency backup policy list` - `dependency-resources.backup-policies.list`
+- `appaloft dependency backup policy show <policyId>` - `dependency-resources.backup-policies.show`
+- `appaloft resource dependency bind <resourceId>` - `resources.bind-dependency`
+- `appaloft resource dependency unbind <resourceId> <bindingId>` - `resources.unbind-dependency`
+- `appaloft resource dependency rotate-secret <resourceId> <bindingId>` - `resources.rotate-dependency-binding-secret`
+- `appaloft resource dependency list <resourceId>` - `resources.list-dependency-bindings`
+- `appaloft resource dependency show <resourceId> <bindingId>` - `resources.show-dependency-binding`
+- `appaloft scheduled-task create <resourceId>` - `scheduled-tasks.create`
+- `appaloft scheduled-task list` - `scheduled-tasks.list`
+- `appaloft scheduled-task show <taskId>` - `scheduled-tasks.show`
+- `appaloft scheduled-task configure <taskId>` - `scheduled-tasks.configure`
+- `appaloft scheduled-task delete <taskId>` - `scheduled-tasks.delete`
+- `appaloft scheduled-task run <taskId>` - `scheduled-tasks.run-now`
+- `appaloft scheduled-task runs list` - `scheduled-task-runs.list`
+- `appaloft scheduled-task runs show <runId>` - `scheduled-task-runs.show`
+- `appaloft scheduled-task runs logs <runId>` - `scheduled-task-runs.logs`
+- `appaloft storage volume create` - `storage-volumes.create`
+- `appaloft storage volume list` - `storage-volumes.list`
+- `appaloft storage volume show <storageVolumeId>` - `storage-volumes.show`
+- `appaloft storage volume rename <storageVolumeId>` - `storage-volumes.rename`
+- `appaloft storage volume delete <storageVolumeId>` - `storage-volumes.delete`
+- `appaloft storage volume cleanup-runtime <storageVolumeId> --server <serverId> --before <iso> [--dry-run false]` - `storage-volumes.cleanup-runtime`
+- `appaloft storage volume backup plan` - `storage-volumes.backup-plan`
+- `appaloft storage volume backup create` - `storage-volumes.create-backup`
+- `appaloft storage volume backup list --storage-volume <storageVolumeId>` - `storage-volumes.list-backups`
+- `appaloft storage volume backup show <backupId>` - `storage-volumes.show-backup`
+- `appaloft storage volume backup restore-plan <backupId>` - `storage-volumes.restore-plan`
+- `appaloft storage volume backup restore <backupId>` - `storage-volumes.restore-backup`
+- `appaloft storage volume backup prune <backupId>` - `storage-volumes.prune-backups`
+- `appaloft storage volume backup policy configure --storage-volume <storageVolumeId>` - `storage-volumes.backup-policies.configure`
+- `appaloft storage volume backup policy list` - `storage-volumes.backup-policies.list`
+- `appaloft storage volume backup policy show <policyId>` - `storage-volumes.backup-policies.show`
+- `appaloft instance portability export-plan` - `control-plane-portability.export-plan`
+- `appaloft instance portability export --passphrase-stdin` - `control-plane-portability.export`
+- `appaloft instance portability import-plan <artifact-file> --mode <merge|replace> --passphrase-stdin` - `control-plane-portability.import-plan`
+- `appaloft instance portability import <artifact-file> --mode <merge|replace> --passphrase-stdin [--acknowledge-replace]` - `control-plane-portability.import`
+- `appaloft instance portability artifact list` - `control-plane-portability.artifacts.list`
+- `appaloft instance portability artifact show <artifactId>` - `control-plane-portability.artifacts.show`
+- `appaloft instance portability artifact delete <artifactId>` - `control-plane-portability.artifacts.delete`
+- `appaloft tunnel start --provider <cloudflare-quick|ngrok> --origin <url>` - `tunnels.start`
+- `appaloft tunnel list` - `tunnels.list`
+- `appaloft tunnel show <sessionId>` - `tunnels.show`
+- `appaloft tunnel revoke <sessionId>` - `tunnels.revoke`
+- `appaloft env create` - `environments.create`
+- `appaloft env list` - `environments.list`
+- `appaloft env count` - `environments.count`
+- `appaloft env show <environmentId>` - `environments.show`
+- `appaloft env rename <environmentId> --name <name>` - `environments.rename`
+- `appaloft env lock <environmentId>` - `environments.lock`
+- `appaloft env unlock <environmentId>` - `environments.unlock`
+- `appaloft env archive <environmentId>` - `environments.archive`
+- `appaloft env clone <environmentId> --name <targetName>` - `environments.clone`
+- `appaloft env copy <environmentId> <targetName>` - `environments.duplicate-profile`
+- `appaloft env set <environmentId> <key> <value>` - `environments.set-variable`
+- `appaloft env unset <environmentId> <key>` - `environments.unset-variable`
+- `appaloft env effective-precedence <environmentId>` - `environments.effective-precedence`
+- `appaloft env diff <environmentId> <otherEnvironmentId>` - `environments.diff`
+- `appaloft env copy <environmentId> <targetName> --dry-run` - `environments.plan-duplicate`
+- `appaloft env diff-profile <environmentId> <targetEnvironmentId>` - `environments.diff-profile`
+- `appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>` - `environments.sync-profile`
+- `appaloft env promote <environmentId> <targetName>` - `environments.promote`
+- `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` - `deployments.cleanup-preview`
+- `appaloft up [path-or-source] [--yes] [--project <projectId>] [--config appaloft.yml] [--application <config-key>] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]` is canonical; `appaloft deploy [path-or-source] [--yes] [--project <projectId>] [--config appaloft.yml] [--application <config-key>] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]; appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` - `deployments.create`; the top-level `deploy` spelling is supported throughout 1.x; first unlinked folder may create/link a Project named after the directory (git is not required); repeat `--application` to deploy a named subset of a repository application graph, or omit it to deploy every declared application; the namespaced form is ids-only and supports remote control-plane profiles after explicit Resource profile and target setup
+- `appaloft deployments retry <deploymentId>` - `deployments.retry`
+- `appaloft deployments redeploy <resourceId>` - `deployments.redeploy`
+- `appaloft deployments force-redeploy <resourceId>` - `deployments.force-redeploy`
+- `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` - `deployments.rollback`
+- `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` - `deployments.cancel`
+- `appaloft deployments reconcile-stale <deploymentId> --state-version <stateVersion> --confirm <deploymentId>` - `deployments.reconcile-stale`
+- `appaloft deployments archive <deploymentId> --confirm <deploymentId>` - `deployments.archive`
+- `appaloft deployments cleanup-runtime <deploymentId> --confirm <deploymentId>` - `deployments.cleanup-runtime`
+- `appaloft deployments prune --before <iso>` - `deployments.prune`
+- `appaloft resource runtime stop [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.stop`
+- `appaloft resource runtime start [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.start`
+- `appaloft resource runtime restart [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.restart`
+- `appaloft deployments list` - `deployments.list`
+- `appaloft deployments stale` - `deployments.stale-attempts`
+- `appaloft deployments count` - `deployments.count`
+- `appaloft deployments show <deploymentId>` - `deployments.show`
+- `appaloft deployments proof <deploymentId>` - `deployments.proof`
+- `appaloft deployments plan --resource <resourceId> --server <serverId> [--project <projectId>] [--environment <environmentId>] [--destination <destinationId>]` - `deployments.plan`
+- `appaloft deployments recovery-readiness <deploymentId>` - `deployments.recovery-readiness`
+- `appaloft deployments timeline <deploymentId>` - `deployments.timeline`
+- `appaloft deployments timeline <deploymentId> --follow --json` - `deployments.timeline.stream`
+- `appaloft work list` - `operator-work.list`
+- `appaloft work show <workId>` - `operator-work.show`
+- `appaloft work events <workId> --follow --json` - `operator-work.stream-events`
+- `appaloft work watch <workId> --json` - `operator-work.stream-events`
+- `appaloft work mark-recovered <workId>` - `operator-work.mark-recovered`
+- `appaloft work dead-letter <workId>` - `operator-work.dead-letter`
+- `appaloft work cancel <workId>` - `operator-work.cancel`
+- `appaloft work retry <workId>` - `operator-work.retry`
+- `appaloft work prune --before <iso>` - `operator-work.prune`
+- `appaloft source-links list` - `source-links.list`
+- `appaloft source-links show <sourceFingerprint>` - `source-links.show`
+- `appaloft source-links relink` - `source-links.relink`
+- `appaloft source-links delete <sourceFingerprint>` - `source-links.delete`
+- `appaloft static-artifacts publish <dist-directory>` - `static-artifacts.publish-payload`
+- `appaloft static-artifacts publish <dist.zip>` - `static-artifacts.publish-archive`
+- `appaloft audit-event list --aggregate <aggregateId>` - `audit-events.list`
+- `appaloft audit-event show <auditEventId> --aggregate <aggregateId>` - `audit-events.show`
+- `appaloft audit-event prune --before <iso>` - `audit-events.prune`
+- `appaloft audit-event export --aggregate <aggregateId>` - `audit-events.export`
+- `appaloft audit-event export-global --from <iso> --to <iso> [--cursor <iso>] [--order asc|desc]` - `audit-events.export-global`
+- `appaloft audit-event archive create` - `audit-events.archives.create`
+- `appaloft audit-event archive list` - `audit-events.archives.list`
+- `appaloft audit-event archive show <archiveId>` - `audit-events.archives.show`
+- `appaloft audit-event archive prune --before <iso>` - `audit-events.archives.prune`
+- `appaloft audit-event legal-hold configure` - `audit-events.legal-holds.configure`
+- `appaloft audit-event legal-hold list` - `audit-events.legal-holds.list`
+- `appaloft audit-event legal-hold show <holdId>` - `audit-events.legal-holds.show`
+- `appaloft audit-event legal-hold release <holdId>` - `audit-events.legal-holds.release`
+- `appaloft retention-default configure --category <category> --retention-days <days>` - `retention-defaults.configure`
+- `appaloft retention-default list` - `retention-defaults.list`
+- `appaloft retention-default show <category>` - `retention-defaults.show`
+- `appaloft domain-event prune --before <iso>` - `domain-events.prune`
+- `appaloft provider-job-log prune --before <iso>` - `provider-job-logs.prune`
+- `appaloft source-event list --resource <resourceId> | --project <projectId>` - `source-events.list`
+- `appaloft source-event show <sourceEventId> --resource <resourceId> | --project <projectId>` - `source-events.show`
+- `appaloft source-event replay <sourceEventId> --resource <resourceId> | --project <projectId>` - `source-events.replay`
+- `appaloft source-event prune --before <iso>` - `source-events.prune`
+- `appaloft default-access configure` - `default-access-domain-policies.configure`
+- `appaloft default-access list` - `default-access-domain-policies.list`
+- `appaloft default-access show --scope system|deployment-target [--server <serverId>]` - `default-access-domain-policies.show`
+- `appaloft domain-binding create` - `domain-bindings.create`
+- `appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns|manual]` - `domain-bindings.confirm-ownership`
+- `appaloft domain-binding list` - `domain-bindings.list`
+- `appaloft domain-binding show <domainBindingId>` - `domain-bindings.show`
+- `appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]` - `domain-bindings.dns-plan`
+- `appaloft domain-binding dns-readiness <domainBindingId>` - `domain-bindings.dns-readiness.inspect`
+- `appaloft domain-binding configure-route <domainBindingId>` - `domain-bindings.configure-route`
+- `appaloft domain-binding configure-certificate-policy <domainBindingId> --policy auto|manual` - `domain-bindings.configure-certificate-policy`
+- `appaloft domain-binding delete-check <domainBindingId>` - `domain-bindings.delete-check`
+- `appaloft domain-binding delete <domainBindingId> --confirm <domainBindingId>` - `domain-bindings.delete`
+- `appaloft domain-binding retry-verification <domainBindingId>` - `domain-bindings.retry-verification`
+- `appaloft certificate import <domainBindingId>` - `certificates.import`
+- `appaloft certificate issue-or-renew <domainBindingId>` - `certificates.issue-or-renew`
+- `appaloft certificate list` - `certificates.list`
+- `appaloft certificate show <certificateId>` - `certificates.show`
+- `appaloft certificate retry <certificateId>` - `certificates.retry`
+- `appaloft certificate revoke <certificateId>` - `certificates.revoke`
+- `appaloft certificate delete <certificateId> --confirm <certificateId>` - `certificates.delete`
+- `appaloft providers list` - `system.providers.list`
+- `appaloft plugins list` - `system.plugins.list`
+- `appaloft doctor` - `system.doctor`
+- `appaloft upgrade check` - `system.instance-upgrade.check`
+- `appaloft upgrade apply` - `system.instance-upgrade.apply`
+- `appaloft db secret-rotation plan [--state-backend ssh-pglite --server-host <host>]` - `system.control-plane-secret-rotation.plan`
+- `appaloft db secret-rotation apply --plan-digest <digest> --backup-reference <reference> [--state-backend ssh-pglite --server-host <host>]` - `system.control-plane-secret-rotation.apply`
+- `appaloft db status` - `system.db-status`
+- `appaloft db migrate [--state-backend ssh-pglite --server-host <host> --remote-runtime-root <root>]` - `system.db-migrate`; an explicit recovery root targets the isolated candidate rather than live state
+- `appaloft connectors categories` - `connections.categories.list`
+- `appaloft connectors catalog` - `connections.catalog.list`
+- `appaloft connectors list` - `connections.list`
+- `appaloft connectors show <connectionId>` - `connections.show`
+- `appaloft connectors connect <connector>` - `connections.connect.start`
+- `appaloft connectors callback <connectionId>` - `connections.connect.callback`
+- `appaloft connectors revoke <connectionId>` - `connections.revoke`
+- `appaloft connectors status <connectionId>` - `connections.status.show`
+- `appaloft connectors plan --connector <connector> --capability <capability>` - `connections.capability.plan`
+- `appaloft connectors accept --connector <connector> --capability <capability> --plan-id <planId>` - `connections.capability.accept`
+- `appaloft connectors apply --connector <connector> --capability <capability>` - `connections.capability.apply`
+
+## Blueprint Install Input Notes
+
+`appaloft blueprint install <slug>` accepts repeated structured text flags:
+
+- `--parameter KEY=value`
+- `--secret KEY=value` or `--secret component:KEY=value`
+- `--dependency-create requirementId[:kind]`
+
+Accepted application-bundle installs must include all three acknowledgement values:
+
+- `--acknowledgement accepts-blueprint-application-bundle`
+- `--acknowledgement reviews-dependency-resource-bindings`
+- `--acknowledgement preserves-user-owned-configuration`
+
+After install returns, use `monitoring.workId` with `appaloft work watch <workId> --json` or
+`appaloft work events <workId> --follow --json`. Use `monitoring.deploymentIds[]` with
+`appaloft deployments timeline <deploymentId> --follow --json` and
+`appaloft deployments show <deploymentId>`.

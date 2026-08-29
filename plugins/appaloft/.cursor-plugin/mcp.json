@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "appaloft": {
+      "type": "http",
+      "url": "https://app.appaloft.com/mcp"
+    }
+  }
+}
