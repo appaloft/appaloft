@@ -64,10 +64,14 @@ must not use laptop HEAD as Workspace truth.
    `~/.agents/skills`. Appaloft also offers `~/.cursor/skills` and
    `~/.config/opencode/skills` because those are the roots Appaloft users
    actually use; they are beyond Railway's documented cloud-agent skill sync.
-   Copy is add-only and only for immediate child directories that contain
-   `SKILL.md`. Skill-tree copy does not copy `mcp.json`, tokens, cookies, `.env`,
-   editor plugin binaries, or files larger than 10MB. First-party Appaloft skill
-   offer stays. This is not a new command and is not the local Agent door.
+   The first interactive `appaloft code` asks whether to sync skills and which
+   one root to read, then stores the answer in `APPALOFT_HOME/agent-prefs.json`.
+   Occupy copies only that saved root. `--yes` or a non-TTY first run stores
+   skills sync off. Copy is add-only and only for immediate child directories
+   that contain `SKILL.md`. Skill-tree copy does not copy `mcp.json`, tokens,
+   cookies, `.env`, editor plugin binaries, or files larger than 10MB.
+   First-party Appaloft skill offer stays. This is not a new command and is
+   not the local Agent door.
 9. Occupy may write **my** laptop vendor credential onto **my** occupancy HOME
    through the same `WriteSandboxFile` path. Grok uses `~/.grok/auth.json`. Codex
    uses `~/.codex/auth.json`. Claude uses a setup-token (`APPALOFT_HOME/claude-setup-token`,
