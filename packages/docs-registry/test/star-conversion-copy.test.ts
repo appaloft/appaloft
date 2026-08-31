@@ -41,7 +41,7 @@ describe("GitHub star-conversion copy", () => {
       expect(screen).toContain("```bash\nappaloft setup agent\n```");
       expect(screen).toMatch(/If you are not logged in|如果还没登录/);
       expect(screen).toContain("https://www.appaloft.com/compare/railway");
-      expect(screen).toMatch(/not a complete replacement|不是 Railway 的完整替代/);
+      expect(screen).toMatch(/not a complete Railway replacement|不是 Railway 的完整替代/);
       expect(screen).not.toContain("appaloft-deploy-loop.gif");
       expect(screen).not.toMatch(/public alpha/i);
       expect(screen).not.toContain("install.sh");
