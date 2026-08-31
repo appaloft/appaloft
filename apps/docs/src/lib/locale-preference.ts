@@ -1,3 +1,5 @@
+import { stripChineseLocaleAliasPrefix } from "./locale-aliases";
+
 export type DocsLocale = "en-US" | "zh-CN";
 
 export const appaloftLocaleCookieMaxAge = 60 * 60 * 24 * 365;
@@ -72,12 +74,13 @@ export function docsPathForLocale(input: {
   readonly pathname: string;
 }): string {
   const localPath = stripDocsBase(input.pathname, input.docsBase);
-  const zhPath =
+  const zhPath = stripChineseLocaleAliasPrefix(
     localPath === "/en"
       ? "/"
       : localPath.startsWith("/en/")
         ? localPath.slice("/en".length)
-        : localPath;
+        : localPath,
+  );
   const nextLocalPath = input.locale === "en-US" ? withEnPrefix(zhPath) : zhPath;
 
   return withDocsBase(nextLocalPath, input.docsBase);

@@ -6,6 +6,7 @@ import icon from "astro-icon";
 import mermaid from "astro-mermaid";
 import { type EnvironmentOptions, type Plugin } from "vite";
 import { docsBase, docsSite } from "./src/lib/config";
+import { astroChineseLocaleAliasRedirects } from "./src/lib/locale-aliases";
 import { rehypeMermaid, remarkMermaid } from "./src/lib/mermaid-plugins";
 import { sidebarItems } from "./src/lib/sidebar-config";
 
@@ -102,6 +103,9 @@ export default defineConfig({
   base: docsBase,
   output: "static",
   outDir: "dist",
+  // www.appaloft.com uses /zh-CN; some crawlers also try /zh. Chinese docs
+  // stay unprefixed — these 308 aliases must not create a second tree.
+  redirects: astroChineseLocaleAliasRedirects(),
   markdown: {
     processor: markdownProcessor,
   },

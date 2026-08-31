@@ -1,0 +1,8 @@
+# Chinese locale aliases for docs.appaloft.com.
+# Default Chinese docs are unprefixed; do not add a second Chinese tree.
+/zh-CN / 308
+/zh-CN/ / 308
+/zh-CN/* /:splat 308
+/zh / 308
+/zh/ / 308
+/zh/* /:splat 308

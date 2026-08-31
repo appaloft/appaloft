@@ -43,6 +43,8 @@ describe("docs locale preference", () => {
   test("maps static docs paths between Chinese root and English prefix", () => {
     expect(docsLocaleFromPath("/", "/")).toBe("zh-CN");
     expect(docsLocaleFromPath("/en/start/first-deployment/", "/")).toBe("en-US");
+    expect(docsLocaleFromPath("/zh-CN/agents/overview", "/")).toBe("zh-CN");
+    expect(docsLocaleFromPath("/zh/agents/overview", "/")).toBe("zh-CN");
     expect(
       docsPathForLocale({
         docsBase: "/",
@@ -57,6 +59,27 @@ describe("docs locale preference", () => {
         pathname: "/en/start/first-deployment/",
       }),
     ).toBe("/start/first-deployment/");
+    expect(
+      docsPathForLocale({
+        docsBase: "/",
+        locale: "zh-CN",
+        pathname: "/zh-CN/agents/overview",
+      }),
+    ).toBe("/agents/overview");
+    expect(
+      docsPathForLocale({
+        docsBase: "/",
+        locale: "en-US",
+        pathname: "/zh-CN/agents/overview",
+      }),
+    ).toBe("/en/agents/overview");
+    expect(
+      docsPathForLocale({
+        docsBase: "/",
+        locale: "zh-CN",
+        pathname: "/zh/agents/overview",
+      }),
+    ).toBe("/agents/overview");
   });
 
   test("keeps embedded /docs base paths when mapping locales", () => {
@@ -74,6 +97,13 @@ describe("docs locale preference", () => {
         pathname: "/docs/en/start/first-deployment/",
       }),
     ).toBe("/docs/start/first-deployment/");
+    expect(
+      docsPathForLocale({
+        docsBase: "/docs",
+        locale: "zh-CN",
+        pathname: "/docs/zh-CN/agents/overview",
+      }),
+    ).toBe("/docs/agents/overview");
   });
 
   test("uses the shared Appaloft locale cookie name and options", () => {
