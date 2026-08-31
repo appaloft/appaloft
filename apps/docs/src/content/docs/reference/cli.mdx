@@ -29,11 +29,12 @@ sidebar:
 ## 常用命令速查
 
 ```bash
-appaloft init                                 # 在当前目录初始化 appaloft.yml
 appaloft up                                   # 部署当前目录
+appaloft setup agent                          # 在本机写入 Skill 与 MCP
+appaloft code                                 # 打开 Workspace 会话
+appaloft init                                 # 在当前目录初始化 appaloft.yml
 appaloft login                                # 登录 Appaloft Cloud 或自托管实例
 appaloft context list                         # 查看本机已保存的 profile/context
-appaloft code                                 # 占用默认 Server 上的我的 Sandbox
 appaloft workspace                            # 管理 Workspace，并嵌入 Agent 原生 TUI
 appaloft dev                                  # 启动本地 Development TUI / foreground 会话
 appaloft dev . --server <serverId>            # 通过 live outbound Worker 远端开发
@@ -67,7 +68,7 @@ TTY 环境必须传入 `--yes` 才会执行登录写入、Project 创建或部�
 
 ## Workspace 快速入口
 
-`appaloft code` 登录后占用团队默认已注册 Server 上的 **我的 Sandbox**。源是远端 SHA。
+`appaloft code` 登录后在团队默认已注册 Server 上打开 Workspace 会话。源是远端 SHA。
 缺少 Adapter/Profile 时会创建不可见的 `appaloft-remote`。笔记本路径不是 Workspace
 真相，脏树也不会上传。TTY 上默认 `code` 立刻进入占用 Workspace TUI，列表折叠，中间显示
 **preparing the agent** 后再 attach。`--no-attach` 用一行 stderr 进度和占用横幅，不 attach。默认 `code` 会选 live 会话，

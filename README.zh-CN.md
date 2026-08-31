@@ -36,13 +36,6 @@ appaloft setup agent
   </p>
 </div>
 
-<p align="center">
-  <img src="./docs/assets/appaloft-deploy-loop.gif" alt="Appaloft 部署、健康验证和公开 URL 终端演示" width="920" />
-</p>
-
-今天就可以从文件夹、Git URL、镜像、Compose 或 zip 部署。Agent Workspace 和 Sandbox
-仍是 public alpha。这是一句实话，不是形式化正确性或合规声明。
-
 ## 安装
 
 先装 CLI。部署不需要先装 self-hosted stack。
@@ -57,6 +50,13 @@ brew install appaloft/tap/appaloft
 
 也可以从 [GitHub Releases](https://github.com/appaloft/appaloft/releases/latest) 下载对应平台
 archive。
+
+<p align="center">
+  <img src="./docs/assets/appaloft-deploy-loop.gif" alt="Appaloft 部署、健康验证和公开 URL 终端演示" width="920" />
+</p>
+
+今天就可以从文件夹、Git URL、镜像、Compose 或 zip 部署。Agent Workspace 和 Sandbox
+仍是 public alpha。这是一句实话，不是形式化正确性或合规声明。
 
 自己带机器时用 `appaloft server register`。Self-hosted plane 登录时加 `--url`。
 
@@ -132,7 +132,6 @@ appaloft auth mcp opencode install
 ```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
-npx skills add appaloft/appaloft --skill appaloft --global --agent cursor --copy --yes
 npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --copy --yes
 ```
 
