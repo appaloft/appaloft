@@ -204,5 +204,11 @@ describe("user-visible Occupancy is forbidden", () => {
       const visible = publicDocsVisibleText(await readFile(file, "utf8"));
       expect(visible, file).not.toMatch(FORBIDDEN);
     }
+    for (const relativePath of ["README.md", "README.zh-CN.md"]) {
+      const readme = join(import.meta.dir, "../../../../", relativePath);
+      expect(publicDocsVisibleText(await readFile(readme, "utf8")), relativePath).not.toMatch(
+        FORBIDDEN,
+      );
+    }
   });
 });

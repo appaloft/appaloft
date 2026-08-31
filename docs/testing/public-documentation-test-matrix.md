@@ -39,6 +39,7 @@ and final round summaries must identify the row as a documented manual or deferr
 | PUB-DOCS-016 | Public docs topics are traceable to specs and product surfaces. | contract | Topics that explain governed behavior record the public page/anchor, internal spec references, and the Web/CLI/API surface that links users to the topic. |
 | PUB-DOCS-017 | Public error guides are human- and agent-readable. | contract | Registered public error guides resolve to a human docs anchor and an agent-readable JSON guide with safe details, responsibility, actionability, remedies, and governing specs. |
 | PUB-DOCS-018 | Public docs honors shared Appaloft locale preference. | contract | The static docs shell reads the shared `appaloft.locale` preference used by www and Web console surfaces, maps between root `zh-CN` paths and `/en/*` paths, and writes the same cookie/localStorage key when users switch docs locale. |
+| PUB-DOCS-019 | GitHub star-conversion copy stays a 60-second two-door path. | contract | README first screen is two-door → `appaloft up` → `appaloft setup agent` → login → Compare Railway (“not a complete replacement”); GIF and Workspace/Sandbox alpha honesty sit below Install; `npx skills add` stays secondary and omits `--agent cursor`; Agents overview markets `appaloft setup agent` (does not deploy); CLI at-a-glance leads with `up` then `setup agent` / `code` without occupy wording; GitHub Release notes are the developer template, not a conventional-changelog occupancy dump. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -194,6 +195,10 @@ Current status:
   remote-operation recovery.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
+- `PUB-DOCS-019` is covered by `packages/docs-registry/test/star-conversion-copy.test.ts` and
+  `scripts/test/generate-release-notes.test.ts`. README, Agents overview, CLI at-a-glance, and the
+  GitHub Release notes generator must stay occupancy-free and lead with `appaloft up` plus
+  `appaloft setup agent`. `FOLDER-ONBOARD-009` also scans README for the word Occupancy.
 - `PUB-DOCS-018` is covered by `apps/docs/src/lib/locale-preference.test.ts`, which verifies
   shared locale normalization, cookie parsing/serialization, cross-subdomain cookie-first
   preference priority, and root

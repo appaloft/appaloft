@@ -88,7 +88,10 @@ nested task, concept, troubleshooting, or reference pages. Product help links mu
 specific nested page available, not the group overview.
 
 Group 7 (Agent 与 Sandbox) must document Agent Workspace and Sandbox as first-class task/concept
-pages, not as an implicit consequence of the Appaloft skill page. At minimum it must cover: what an
+pages, not as an implicit consequence of the Appaloft skill page. The Agents overview start page
+markets `appaloft setup agent` (skill + MCP on this machine; it does not deploy). Workspace,
+Sandbox, and later preview surfaces stay on their own pages as later/public-alpha work, not the
+start-page story. At minimum the group must cover: what an
 Agent Workspace is and how it relates to a Sandbox; how to create, connect to, and clean up a
 Workspace; how Workspace Collaboration and hibernation/recovery behave; how agent adapters are
 installed and selected; and the Grok Bot plugin install path at `/agents/grok-bot-plugin` (both

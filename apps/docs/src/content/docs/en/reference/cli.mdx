@@ -28,11 +28,12 @@ sidebar:
 ## Common commands at a glance
 
 ```bash
-appaloft init                                 # Initialize appaloft.yml in the current directory
 appaloft up                                   # Deploy the current directory
+appaloft setup agent                          # Teach local hosts skill + MCP
+appaloft code                                 # Open a Workspace session
+appaloft init                                 # Initialize appaloft.yml in the current directory
 appaloft login                                # Log in to Appaloft Cloud or a self-hosted instance
 appaloft context list                         # View saved local profiles/contexts
-appaloft code                                 # Occupy my Sandbox on the default Server
 appaloft workspace                            # Manage Workspaces with an embedded native Agent TUI
 appaloft dev                                  # Start the local Development TUI / foreground session
 appaloft dev . --server <serverId>            # Develop remotely through a live outbound Worker
@@ -68,7 +69,7 @@ New commands, documentation, and automation should prefer `appaloft up`. See
 
 ## Workspace quick entry
 
-`appaloft code` occupies **my Sandbox** on the team's default enrolled Server
+`appaloft code` opens a Workspace session on the team's default enrolled Server
 after login. Source is the remote SHA. Missing Adapter/Profile create the
 invisible `appaloft-remote`. The laptop path is not Workspace truth, and dirty
 files are not uploaded. On a TTY, default `code` enters the Cloud Agents

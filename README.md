@@ -36,14 +36,6 @@ If you are not logged in, you will be asked to log in.
   </p>
 </div>
 
-<p align="center">
-  <img src="./docs/assets/appaloft-deploy-loop.gif" alt="Appaloft deploy, health verification, and public URL terminal demo" width="920" />
-</p>
-
-Deploy from a folder, Git URL, image, Compose file, or zip is available today. Agent Workspace and
-Sandbox surfaces are public alpha. That is an honesty line, not a formal correctness or compliance
-claim.
-
 ## Install
 
 Install the CLI first. You do not need the self-hosted stack to deploy.
@@ -58,6 +50,14 @@ brew install appaloft/tap/appaloft
 
 Or download a platform archive from
 [GitHub Releases](https://github.com/appaloft/appaloft/releases/latest).
+
+<p align="center">
+  <img src="./docs/assets/appaloft-deploy-loop.gif" alt="Appaloft deploy, health verification, and public URL terminal demo" width="920" />
+</p>
+
+Deploy from a folder, Git URL, image, Compose file, or zip is available today. Agent Workspace and
+Sandbox surfaces are public alpha. That is an honesty line, not a formal correctness or compliance
+claim.
 
 If you bring your own machine, register it with `appaloft server register`. For a self-hosted
 plane, pass `--url` when you log in.
@@ -137,7 +137,6 @@ install the CLI or write MCP config.
 ```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
-npx skills add appaloft/appaloft --skill appaloft --global --agent cursor --copy --yes
 npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --copy --yes
 ```
 

@@ -1,28 +1,35 @@
 ---
-title: "Agents and Sandboxes Overview"
-description: "How an AI agent safely uses Workspaces and Sandboxes through existing Appaloft entrypoints."
+title: "Agents"
+description: "Teach a local agent host Appaloft with appaloft setup agent. Workspace and Sandbox come later."
 docType: "concept"
 ---
 
 ## Short definition
 
-This group explains how an AI agent uses Appaloft safely: get capability documentation through the [Full Appaloft Skill](/docs/en/agents/skill/), complete deployments through the [Agent Deploy Subprotocol](/docs/en/agents/deploy-skill/), and get an isolated execution environment through [Agent Workspace](/docs/en/agents/workspaces/) and the [Sandbox Model](/docs/en/agents/sandboxes/).
+The marketed Agent door is one command on this machine:
 
-**Maturity note**: Agent Workspace and Sandbox are currently in **Private Preview** — interfaces and behavior may change; depend on them cautiously on production-critical paths.
+```bash
+appaloft setup agent
+```
+
+It copies the Appaloft skill and writes token-free MCP into the hosts you already use. It does **not** deploy an app. Deploy stays [`appaloft up`](/docs/en/start/first-deployment/).
+
+Workspace, Sandbox, and later preview surfaces are public alpha. They are not the start-page story.
 
 ```mermaid
 flowchart TD
-    SKILL["Full Appaloft Skill\ncapability entrypoint"] --> DEPLOY["Agent Deploy Subprotocol\ncalls existing CLI/API/Web"]
-    SKILL --> WS["Agent Workspace\ncollaboration + lifecycle"]
-    WS --> SB["Sandbox\nisolated execution environment"]
-    SB --> TASK["Task Run\nsubmit and observe one agent execution"]
-    DEPLOY --> OP["Shared business operations\n(operation catalog)"]
-    TASK --> OP
+    SETUP["appaloft setup agent\nskill + MCP on this machine"] --> SKILL["Full Appaloft Skill\ncapability entrypoint"]
+    SKILL --> DEPLOY["Agent Deploy Subprotocol\ncalls existing CLI/API/Web"]
+    SKILL --> LATER["Workspace / Sandbox\nlater, public alpha"]
+    DEPLOY --> OP["Shared business operations"]
+    LATER --> OP
 ```
 
 ## Why this group exists
 
 When an AI agent operates Appaloft, it must follow exactly the same boundaries as a human user: it can't bypass the application layer to operate the database, SSH, or a provider SDK directly, can't read plaintext secrets, and can't invent "agent-exclusive operations" that only it can call. This group collects the rules for "how an agent should use Appaloft safely" in one place, instead of repeating them scattered across every feature page.
+
+Start with `appaloft setup agent`. Read Workspace and Sandbox pages only when you need those later surfaces.
 
 ## Core concepts at a glance
 
@@ -30,8 +37,8 @@ When an AI agent operates Appaloft, it must follow exactly the same boundaries a
 | --- | --- | --- |
 | Appaloft Skill | The agent's complete capability manual, mapped to the same operations as CLI/API/Web | [Full Appaloft Skill](/docs/en/agents/skill/) |
 | Deploy subprotocol | How an agent safely triggers a deployment | [Agent Deploy Subprotocol](/docs/en/agents/deploy-skill/) |
-| Agent Workspace | The container for an agent's long-lived collaboration and execution, built on Sandbox | [Agent Workspace](/docs/en/agents/workspaces/) |
-| Sandbox | The isolated execution environment model behind Workspace | [Sandbox Model](/docs/en/agents/sandboxes/) |
+| Agent Workspace | Later surface: long-lived collaboration on a Sandbox, currently public alpha | [Agent Workspace](/docs/en/agents/workspaces/) |
+| Sandbox | Later surface: isolated execution environment behind Workspace, currently public alpha | [Sandbox Model](/docs/en/agents/sandboxes/) |
 | Task Run | Submitting, observing, and reviewing one agent execution on a Sandbox | [Workspace Collaboration And Pause/Resume](/docs/en/agents/tasks/) |
 | Agent adapters | How to install and choose a specific agent runtime | [Agent Adapters](/docs/en/agents/adapters/) |
 | Preview and promotion | Agent-driven preview deployment and production promotion flow | [Agent Previews And Promotion](/docs/en/agents/preview-promote/) |
@@ -41,9 +48,11 @@ When an AI agent operates Appaloft, it must follow exactly the same boundaries a
 
 ## Common mistakes
 
+- **Treating `appaloft setup agent` as a deploy**: it only teaches local hosts. Deploy with `appaloft up`.
 - **Treating agent deployment as a new business operation**: agent deployment only translates "deploy this project" into existing project, server, environment, and resource operations — it never adds capabilities only an agent can call.
 - **Letting an agent read `.env`, private keys, or token files directly**: an agent should always work through the CLI/API/Web/MCP entrypoints — secrets should be injected through a trusted secret manager or environment variables, never read directly by the agent.
 - **Assuming Appaloft uploads artifacts to a managed cloud**: unless the user explicitly opts into Appaloft Cloud's managed capability, the default deployment target is still the BYOS server the user chose themselves.
+- **Starting on Workspace or Sandbox**: those pages are later and public alpha, not the Agent door.
 
 ## Related tasks
 
