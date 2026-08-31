@@ -113,6 +113,10 @@ stock Nimbus scaffold, and known follow-ups:
   (embedded self-hosted build) — both must succeed.
 - **Locales**: zh-CN content lives at the collection root (`src/content/docs/<group>/*.mdx`);
   en-US mirrors it one level down under `en/` (`src/content/docs/en/<group>/*.mdx`).
+  Official URLs stay unprefixed for Chinese and `/en/*` for English. `/zh-CN` and `/zh`
+  (and their subpaths) are 308 aliases onto the Chinese tree — see
+  `src/lib/locale-aliases.ts`, `public/_redirects`, and `astro.config.ts` `redirects`.
+  Do not add a second Chinese content tree under those prefixes.
   `src/lib/locale.ts` filters Nimbus's single global sidebar tree
   (`src/lib/sidebar-config.ts`) per page locale. `src/lib/locale-preference.ts` and
   `src/lib/locale-sync.client.ts` port the old Fumadocs app's cookie logic

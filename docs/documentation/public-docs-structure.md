@@ -292,6 +292,11 @@ The initial public docs locales are:
 - `zh-CN`;
 - `en-US`.
 
+On the official docs host, `zh-CN` is the unprefixed default (`/` and `/agents/overview`). English
+is `/en/*`. `/zh-CN`, `/zh-CN/*`, `/zh`, and `/zh/*` are permanent 308 aliases onto that same
+Chinese tree so www.appaloft.com `/zh-CN` links and crawlers do not 404. Do not change the default
+locale and do not publish a second Chinese content tree under those prefixes.
+
 The default authoring language may be `zh-CN` during early product shaping, but each public docs
 page must declare its locale state:
 
